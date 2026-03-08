@@ -1,4 +1,4 @@
-function [time, u, jumps] = createSignal(obj)
+function [time, u, jumps, umax] = createSignal(obj)
 %CREATESIGNAL Создавалка сигнала по дано
     
     prec = obj.prec;
@@ -7,13 +7,10 @@ function [time, u, jumps] = createSignal(obj)
     U3 = obj.U3;
     U4 = obj.U4;
     T = obj.T;
-    n = obj.n;
-    m = obj.m;
-    f_gr = obj.f_gr;
     T2 = obj.T2;
 
     % Создание функций
-    time = [-T2 linspace(-0.01.*T2, 1.01.*T2, 10000*prec) 3.*T2];
+    time = linspace(-0.01.*T2, 1.01.*T2, 10000*prec);
     u = zeros(length(T), length(time));
     
     kusok1 = false(3, length(time));
@@ -34,6 +31,8 @@ function [time, u, jumps] = createSignal(obj)
         u(k, kusok2(k,:))  = U3 + (U4-U3) .* (time(kusok2(k,:)) - T(k)) / (T2 - T(k));
     end
     
+    umax = max(u(1,:));
+
     % Запоминаем, где скачки (ыхыхых скАчки)
     % Первое измерение - версия графика (для разных T)
     % Второе измерение - номер скачка
@@ -51,10 +50,10 @@ function [time, u, jumps] = createSignal(obj)
     end
     if U4 > 0 && U2 ~=U3
         jumps(:,3,1) = T2;
-        jumps(:,3,2) = U4;
+        jumps(:,3,2) = -U4;
     elseif U4 > 0 && U2 ==U3
         jumps(:,2,1) = T2;
-        jumps(:,2,2) = U4;
+        jumps(:,2,2) = -U4;
     end
 
 
