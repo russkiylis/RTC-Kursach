@@ -23,4 +23,4 @@ solver = KursachSolver(U1, U2, U3, U4, T, n, m, f_gr, T2, precision);
 % plot(solver.time(1:precision:end), solver.u(1,1:precision:end));
 % stem(j_time, j_ampl);
 % xlim([-1e-6 6e-6]);
-% ylim([-0.5 6.5]);
+% ylim([-0.5 6.5]); %bluh
