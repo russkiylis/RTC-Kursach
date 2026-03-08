@@ -56,5 +56,4 @@ function [time, u, jumps, umax] = createSignal(obj)
         jumps(:,2,2) = -U4;
     end
 
-
 end
