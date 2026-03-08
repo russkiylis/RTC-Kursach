@@ -2,6 +2,8 @@ classdef KursachSolver < handle
     %KURSACHSOLVER Решает курсовик по РТЦиС
 
     properties
+        prec;  % Точность вычислений
+
         U1;
         U2;
         U3;
@@ -11,10 +13,14 @@ classdef KursachSolver < handle
         m;
         f_gr;
         T2;
+
+        time;
+        u;
+        jumps;
     end
 
     methods
-        function obj = KursachSolver(U1, U2, U3, U4, T, n, m, f_gr, T2)
+        function obj = KursachSolver(U1, U2, U3, U4, T, n, m, f_gr, T2, prec)
             %KURSACHSOLVER Конструктор
             % T - в виде вектора
             % f_gr - "min", "max"
@@ -28,16 +34,17 @@ classdef KursachSolver < handle
             obj.m = m;
             obj.f_gr = f_gr;
             obj.T2 = T2;
-
+            obj.prec = prec;
+            
             % Генерируем сигнал по дано
-            createSignal(obj);
+            [obj.time, obj.u, obj.jumps] = createSignal(obj);
 
 
         end
     end
 
     methods (Access=protected)
-        obj = createSignal(obj)    % Создавалка сигнала по дано
+        [time, u, jumps] = createSignal(obj)    % Создавалка сигнала по дано
         
     end
 end
