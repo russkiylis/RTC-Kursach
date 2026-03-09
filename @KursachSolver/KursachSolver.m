@@ -62,4 +62,9 @@ classdef KursachSolver < handle
         [time, u, jumps, umax] = createSignal(obj)    % Создавалка сигнала по дано
         [cyclic_freq, noise_SPM, W0, omega_gr_n] = createNoiseSPM(obj)     % Создавалка СПМ шума по дано
     end
+
+    methods
+        showSignal(obj)     % Вывод сигнала из дано
+        showNoiseSPM(obj)   % Вывод СПМ шума из дано
+    end
 end
