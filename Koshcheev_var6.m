@@ -24,3 +24,5 @@ solver = KursachSolver(U1, U2, U3, U4, T, n, m, f_gr, T2, precision);
 % stem(j_time, j_ampl);
 % xlim([-1e-6 6e-6]);
 % ylim([-0.5 6.5]);
+
+solver.showSignal();

@@ -27,3 +27,5 @@ solver = KursachSolver(U1, U2, U3, U4, T, n, m, f_gr, T2, precision);
 
 % plot(solver.cyclic_freq(1:precision:end), solver.noise_SPM(1:precision:end));
 
+solver.showSignal();
+
