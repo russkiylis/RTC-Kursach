@@ -21,7 +21,7 @@ xline(-omega_gr_n, '--', "-\omegaгр");
 xline(omega_gr_n, '--', "\omegaгр");
 yline(W0, '--', "W0");
 
-title("СПМ шума, W0 = "+num2str(W0)+" В^2/Гц, |\omegaгр| = "+num2str(omega_gr_n));
+title("СПМ шума, W0 = " + sprintf("%.2e", W0) + " В^2/Гц, |\omegaгр| = " + sprintf("%.2e", omega_gr_n) + " рад/с");
 xlabel("\omega, рад/с");
 ylabel("W(\omega), В^2/Гц");
 
