@@ -64,6 +64,7 @@ classdef KursachSolver < handle
     end
 
     methods
-        showSignal(obj)     % Вывод сигнала
+        showSignal(obj)     % Вывод сигнала из дано
+        showNoiseSPM(obj)   % Вывод СПМ шума из дано
     end
 end
