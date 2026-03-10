@@ -1,16 +1,17 @@
-function [time, u, jumps, umax] = createSignal(obj)
+function [time, dt, u, jumps, umax] = dano_createSignal(obj)
 %CREATESIGNAL Создавалка сигнала по дано
     
-    prec = obj.prec;
     U1 = obj.U1;
     U2 = obj.U2;
     U3 = obj.U3;
     U4 = obj.U4;
     T = obj.T;
     T2 = obj.T2;
+    N = obj.N;
 
     % Создание функций
-    time = linspace(-0.01.*T2, 1.01.*T2, 10000*prec);
+    time = linspace(-0.01.*T2, 1.01.*T2, N);
+    dt = time(2)-time(1);
     u = zeros(length(T), length(time));
     
     kusok1 = false(3, length(time));

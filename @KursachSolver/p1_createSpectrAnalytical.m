@@ -1,5 +1,5 @@
-function [outputArg1,outputArg2] = SpectrCount_1(inputArg1,inputArg2)
-%SPECTRCOUNT_1 Summary of this function goes here
+function [outputArg1,outputArg2] = p1_createSpectrAnalytical(inputArg1,inputArg2)
+%SPECTRANALYTICAL_1 Summary of this function goes here
 %   Detailed explanation goes here
 arguments (Input)
     inputArg1
