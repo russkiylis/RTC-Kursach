@@ -2,7 +2,6 @@ classdef KursachSolver < handle
     %KURSACHSOLVER Решает курсовик по РТЦиСу
 
     properties
-        prec;  % Точность вычислений
 
         % Далее идут параметры из дано
         U1;
@@ -15,24 +14,33 @@ classdef KursachSolver < handle
         f_gr;
         T2;
         
+        %--Оси--%
+        N = 10000;  % Количество точек
         time;   % Ось времени
         cyclic_freq;    % Ось частоты
+        freqFFT; % Ось частоты для FFT
+        dt; % Деление по времени
 
-        % Параметры, связанные с сигналом
+        %--Параметры, связанные с сигналом--%
         u;  % Матрица из сигналов
         umax;   % Максимум сигнала
         jumps;  % Трёхмерный массив скачков
 
-        % Параметры, связанные с СПМ шума
+        %--Параметры, связанные с СПМ шума--%
         noise_SPM;  % СПМ шума
         W0; % Амплитуда СПМ
         omega_gr_n; % Граничная частота
 
+        %--Параметры, связанные со спектром--%
+        spectrFFT; % Посчитанные через FFT спектры
+        zpad;
+        f_gr01_FFT; % Частоты среза для FFT-спектров по уровню 0.1
+        selectedSignal; % Выбранный сигнал
 
     end
 
     methods
-        function obj = KursachSolver(U1, U2, U3, U4, T, n, m, f_gr, T2, prec)
+        function obj = KursachSolver(U1, U2, U3, U4, T, n, m, f_gr, T2)
             %KURSACHSOLVER Конструктор
             % T - в виде вектора
             % f_gr - "min", "max"
@@ -46,25 +54,35 @@ classdef KursachSolver < handle
             obj.m = m;
             obj.f_gr = f_gr;
             obj.T2 = T2;
-            obj.prec = prec;
-            
+
             % Генерируем сигнал по дано
-            [obj.time, obj.u, obj.jumps, obj.umax] = createSignal(obj);
+            [obj.time, obj.dt, obj.u, obj.jumps, obj.umax] = dano_createSignal(obj);
             
             % Генерируем СПМ шума по дано
-            [obj.cyclic_freq, obj.noise_SPM, obj.W0, obj.omega_gr_n] = createNoiseSPM(obj);
+            [obj.cyclic_freq, obj.noise_SPM, obj.W0, obj.omega_gr_n] = dano_createNoiseSPM(obj);
 
+            % Генерируем FFT спектры сигналов
+            obj = p1_createSpectrFFT(obj);
 
         end
     end
 
     methods (Access=protected)
-        [time, u, jumps, umax] = createSignal(obj)    % Создавалка сигнала по дано
-        [cyclic_freq, noise_SPM, W0, omega_gr_n] = createNoiseSPM(obj)     % Создавалка СПМ шума по дано
+        %--ДАНО--%
+        [time, dt, u, jumps, umax] = dano_createSignal(obj)    % Создавалка сигнала по дано
+        [cyclic_freq, noise_SPM, W0, omega_gr_n] = dano_createNoiseSPM(obj)     % Создавалка СПМ шума по дано
+        
+        %--ПУНКТ 1--%
+        obj = p1_createSpectrFFT(obj);
+        obj = p1_createSpectrAnalytical(obj);
     end
 
     methods
-        showSignal(obj)     % Вывод сигнала из дано
-        showNoiseSPM(obj)   % Вывод СПМ шума из дано
+        %--ДАНО--%
+        dano_showSignal(obj)     % Вывод сигнала из дано
+        dano_showNoiseSPM(obj)   % Вывод СПМ шума из дано
+
+        %--ПУНКТ 1--%
+        p1_showSpectrFFT(obj)  % Вывод FFT-расчёта спектров
     end
 end

@@ -1,14 +1,13 @@
-function showNoiseSPM(obj)
+function dano_showNoiseSPM(obj)
 %SHOWSIGNAL Вывод СПМ шума из дано
 
 cyclic_freq = obj.cyclic_freq;
 noiseSPM = obj.noise_SPM;
 W0 = obj.W0;
 omega_gr_n = obj.omega_gr_n;
-prec = obj.prec;
 
 figure(name="СПМ шума");
-plot([-2.*omega_gr_n cyclic_freq(1:prec:end) 2.*omega_gr_n], [0 noiseSPM(1:prec:end) 0], LineWidth=3);
+plot([-2.*omega_gr_n cyclic_freq 2.*omega_gr_n], [0 noiseSPM 0], LineWidth=3);
 grid on;
 xlim([-1.5.*omega_gr_n 1.5.*omega_gr_n]);
 ylim([-0.2.*W0 1.3.*W0]);
