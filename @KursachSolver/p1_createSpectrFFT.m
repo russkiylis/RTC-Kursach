@@ -35,5 +35,7 @@ function obj = p1_createSpectrFFT(obj)
         mid_idx = all_idx(all_idx ~= idx_max & all_idx ~= idx_min);
         obj.selectedSignal = mid_idx(1);
     end
+    
+    obj.slopes = obj.slopes(obj.selectedSignal,:);
 
 end

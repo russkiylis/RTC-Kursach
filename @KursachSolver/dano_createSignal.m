@@ -56,5 +56,22 @@ function [time, dt, u, jumps, umax] = dano_createSignal(obj)
         jumps(:,2,1) = T2;
         jumps(:,2,2) = -U4;
     end
+    
+
+    % % Запоминаем где первая производная это константа (в сигнале наклон)
+    for k = 1:3
+        i=1;
+        if U2~=U1 && T(k)~=0  
+            obj.slopes(k,i).t1 = 0;
+            obj.slopes(k,i).t2 = T(k);
+            obj.slopes(k,i).diff = (U2-U1)/(T(k)-0);
+            i = i+1;
+        end
+        if U4~=U3 && T2~=T(k)
+            obj.slopes(k,i).t1 = T(k);
+            obj.slopes(k,i).t2 = T2;
+            obj.slopes(k,i).diff = (U4-U3)/(T2-T(k));
+        end
+    end
 
 end
