@@ -35,28 +35,22 @@ function [time, dt, u, jumps, umax] = dano_createSignal(obj)
     umax = max(u(1,:));
 
     % Запоминаем, где скачки (ыхыхых скАчки)
-    % Первое измерение - версия графика (для разных T)
-    % Второе измерение - номер скачка
-    % Третье измерение - время и амплитуда скачка
-    jumps = zeros(3,1,2);
-    if U1 > 0
-        jumps(:,1,1) = 0;
-        jumps(:,1,2) = U1;
-    end
-    if U2 ~= U3
-        for k = 1:3
-            jumps(:,2,1) = T';
-            jumps(:,2,2) = U3-U2;
+    for k = 1:3
+        if U1 > 0
+            obj.jumps{k}.time = [obj.jumps{k}.time 0]; %#ok<*AGROW>
+            obj.jumps{k}.amplitude = [obj.jumps{k}.amplitude U1];
+        end
+        if U2 ~= U3
+            obj.jumps{k}.time = [obj.jumps{k}.time T(k)];
+            obj.jumps{k}.amplitude = [obj.jumps{k}.amplitude U3-U2];
+        end
+        if U4 > 0
+            obj.jumps{k}.time = [obj.jumps{k}.time T2];
+            obj.jumps{k}.amplitude = [obj.jumps{k}.amplitude -U4];
         end
     end
-    if U4 > 0 && U2 ~=U3
-        jumps(:,3,1) = T2;
-        jumps(:,3,2) = -U4;
-    elseif U4 > 0 && U2 ==U3
-        jumps(:,2,1) = T2;
-        jumps(:,2,2) = -U4;
-    end
-    
+
+
 
     % % Запоминаем где первая производная это константа (в сигнале наклон)
     for k = 1:3

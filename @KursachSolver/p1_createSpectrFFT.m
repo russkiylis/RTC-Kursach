@@ -37,5 +37,14 @@ function obj = p1_createSpectrFFT(obj)
     end
     
     obj.slopes = obj.slopes(obj.selectedSignal,:);
+    % slopes_temp.t1 = obj.slopes(:,1);
+    % slopes_temp.t2 = obj.slopes(:,2);
+    % slopes_temp.diff = obj.slopes(:,3);
+    % obj.slopes = slopes_temp;
+
+    obj.jumps = obj.jumps(obj.selectedSignal,:,:);
+    jumps_temp.t = obj.jumps(1,:,1);
+    jumps_temp.A = obj.jumps(1,:,2);
+    obj.jumps = jumps_temp;
 
 end

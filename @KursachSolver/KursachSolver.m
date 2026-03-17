@@ -24,7 +24,7 @@ classdef KursachSolver < handle
         %--Параметры, связанные с сигналом--%
         u;  % Матрица из сигналов
         umax;   % Максимум сигнала
-        jumps;  % Трёхмерный массив скачков
+        jumps;  % Список скачков
         slopes;
 
         %--Параметры, связанные с СПМ шума--%
@@ -37,6 +37,8 @@ classdef KursachSolver < handle
         zpad;
         f_gr01_FFT; % Частоты среза для FFT-спектров по уровню 0.1
         selectedSignal; % Выбранный сигнал
+        spectrAnalytical_zveno; % Аналитический спектр по звеньям
+        spectrAnalytical;   % Суммарный аналитический спектр
 
     end
 
