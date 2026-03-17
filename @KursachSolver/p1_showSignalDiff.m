@@ -28,20 +28,38 @@ for k = 1:length(slopes.diff)
     id_line = time > t1 & time < t2;
     res(id_line) = slopes.diff(k);
 end
-    plot(time, res, Color=color_slopes, LineWidth=3);
+h_slopes = plot(time, res, Color=color_slopes, LineWidth=3);
 
 % Скачки (stem с треугольниками)
+h_jumps = [];
 if ~isempty(jumps.time)
     pos = jumps.amplitude > 0;
     neg = jumps.amplitude < 0;
     if any(pos)
-        stem(jumps.time(pos), jumps.amplitude(pos), '^', 'filled', ...
+        h_jumps = stem(jumps.time(pos), jumps.amplitude(pos), '^', 'filled', ...
              Color=color_jumps, LineWidth=2, MarkerSize=10, MarkerFaceColor=color_jumps);
     end
     if any(neg)
-        stem(jumps.time(neg), jumps.amplitude(neg), 'v', 'filled', ...
+        h_neg = stem(jumps.time(neg), jumps.amplitude(neg), 'v', 'filled', ...
              Color=color_jumps, LineWidth=2, MarkerSize=10, MarkerFaceColor=color_jumps);
+        if isempty(h_jumps), h_jumps = h_neg; end
     end
+
+    % Подписи δ-функций рядом со скачками
+    for i = 1:length(jumps.time)
+        label = formatDelta(obj.jumps.amplitude(i), jumps.time(i), "\delta");
+        t = text(jumps.time(i), jumps.amplitude(i), "  " + label, ...
+            FontSize=9, Color=color_jumps, FontWeight='bold', AffectAutoLimits='on');
+        uistack(t, 'top');
+    end
+end
+
+% Легенда
+if ~isempty(h_jumps)
+    legend([h_slopes, h_jumps], "От наклона", "От скачка (\delta-функция)", ...
+        Location="northeast");
+else
+    legend(h_slopes, "От наклона", Location="best");
 end
 
 grid on;
@@ -68,28 +86,63 @@ combined_amps = accumarray(idx, imp_amps);
 pos = combined_amps > 0;
 neg = combined_amps < 0;
 
+h_slopes2 = [];
 if any(pos)
-    stem(unique_times(pos), combined_amps(pos), '^', 'filled', ...
+    h_slopes2 = stem(unique_times(pos), combined_amps(pos), '^', 'filled', ...
          Color=color_slopes, LineWidth=2, MarkerSize=10, MarkerFaceColor=color_slopes);
 end
 if any(neg)
-    stem(unique_times(neg), combined_amps(neg), 'v', 'filled', ...
+    h_neg2 = stem(unique_times(neg), combined_amps(neg), 'v', 'filled', ...
          Color=color_slopes, LineWidth=2, MarkerSize=10, MarkerFaceColor=color_slopes);
+    if isempty(h_slopes2), h_slopes2 = h_neg2; end
+end
+
+% Подписи δ'-функций от наклонов
+nonzero = combined_amps ~= 0;
+for i = find(nonzero)'
+    label = formatDelta(combined_amps(i), unique_times(i), "\delta'");
+    t = text(unique_times(i), combined_amps(i), "  " + label, ...
+        FontSize=9, Color=color_slopes, FontWeight='bold', AffectAutoLimits='on');
+    uistack(t, 'top');
 end
 
 % Импульсы от скачков
+h_jumps2 = [];
 if ~isempty(jumps.time)
     pos_j = jumps.amplitude > 0;
     neg_j = jumps.amplitude < 0;
 
     if any(pos_j)
-        stem(jumps.time(pos_j), jumps.amplitude(pos_j), '^', 'filled', ...
+        h_jumps2 = stem(jumps.time(pos_j), jumps.amplitude(pos_j), '^', 'filled', ...
              Color=color_jumps, LineWidth=2, MarkerSize=10, MarkerFaceColor=color_jumps);
     end
     if any(neg_j)
-        stem(jumps.time(neg_j), jumps.amplitude(neg_j), 'v', 'filled', ...
+        h_neg_j2 = stem(jumps.time(neg_j), jumps.amplitude(neg_j), 'v', 'filled', ...
              Color=color_jumps, LineWidth=2, MarkerSize=10, MarkerFaceColor=color_jumps);
+        if isempty(h_jumps2), h_jumps2 = h_neg_j2; end
     end
+
+    % Подписи δ-функций от скачков
+    for i = 1:length(jumps.time)
+        label = formatDelta(obj.jumps.amplitude(i), jumps.time(i), "\delta");
+        t = text(jumps.time(i), jumps.amplitude(i), "  " + label, ...
+            FontSize=9, Color=color_jumps, FontWeight='bold',AffectAutoLimits='on');
+        uistack(t, 'top');
+    end
+end
+
+% Легенда
+handles = []; labels = {};
+if ~isempty(h_slopes2)
+    handles = [handles, h_slopes2];
+    labels{end+1} = "\delta'(t) (от наклона)";
+end
+if ~isempty(h_jumps2)
+    handles = [handles, h_jumps2];
+    labels{end+1} = "\delta(t) (от скачка)";
+end
+if ~isempty(handles)
+    legend(handles, labels, Location="northeast");
 end
 
 grid on;
@@ -102,4 +155,27 @@ title("Вторая производная сигнала");
 xlabel("t, с");
 ylabel("u''(t)");
 
+end
+
+%% Вспомогательная функция форматирования δ-подписи
+function str = formatDelta(amplitude, t, delta_symbol)
+    % Формирует строку вида "Aδ(t)" или "Aδ(t - τ)"
+
+    % Аргумент δ-функции
+    if t == 0
+        arg = "t";
+    else
+        arg = sprintf("t - %g", t);
+    end
+
+    % Амплитудный коэффициент
+    if amplitude == 1
+        coeff = "";
+    elseif amplitude == -1
+        coeff = "-";
+    else
+        coeff = sprintf("%.2g", amplitude);
+    end
+
+    str = coeff + delta_symbol + "(" + arg + ")";
 end

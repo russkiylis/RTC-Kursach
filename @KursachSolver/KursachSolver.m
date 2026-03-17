@@ -69,6 +69,9 @@ classdef KursachSolver < handle
 
             % Генерируем FFT спектры сигналов
             obj = p1_createSpectrFFT(obj);
+            
+            % Создание аналитического спектра
+            obj = p1_createSpectrAnalytical(obj);
 
         end
     end
