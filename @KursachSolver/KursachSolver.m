@@ -26,6 +26,7 @@ classdef KursachSolver < handle
         umax;   % Максимум сигнала
         jumps;  % Список скачков
         slopes;
+        time_mult;  % Мультипликатор времени (например 1e-6 для мкс)
 
         %--Параметры, связанные с СПМ шума--%
         noise_SPM;  % СПМ шума
@@ -43,11 +44,12 @@ classdef KursachSolver < handle
     end
 
     methods
-        function obj = KursachSolver(U1, U2, U3, U4, T, n, m, f_gr, T2)
+        function obj = KursachSolver(U1, U2, U3, U4, T, n, m, f_gr, T2, time_mult)
             %KURSACHSOLVER Конструктор
             % T - в виде вектора
             % f_gr - "min", "max"
-            
+            % time_mult - мультипликатор времени (например 1e-6)
+
             obj.U1 = U1;
             obj.U2 = U2;
             obj.U3 = U3;
@@ -57,6 +59,7 @@ classdef KursachSolver < handle
             obj.m = m;
             obj.f_gr = f_gr;
             obj.T2 = T2;
+            obj.time_mult = time_mult;
 
             % Генерируем сигнал по дано
             [obj.time, obj.dt, obj.u, obj.jumps, obj.slopes, obj.umax] = dano_createSignal(obj);
