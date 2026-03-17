@@ -35,9 +35,6 @@ function [time, dt, u, jumps, slopes, umax] = dano_createSignal(obj)
     umax = max(u(1,:));
 
     % Запоминаем, где скачки (ыхыхых скАчки)
-    % Первое измерение - версия графика (для разных T)
-    % Второе измерение - номер скачка
-    % Третье измерение - время и амплитуда скачка
     jumps = cell(3,1);
     for k = 1:3
         jumps{k}.time = [];
@@ -60,15 +57,18 @@ function [time, dt, u, jumps, slopes, umax] = dano_createSignal(obj)
     % Запоминаем где первая производная это константа (в сигнале наклон)
     slopes = cell(3,1);
     for k = 1:3
-        slopes{k}.time = [];
+        slopes{k}.time1 = [];
+        slopes{k}.time2 = [];
         slopes{k}.diff = [];
 
         if U2~=U1 && T(k)~=0
-            slopes{k}.time = [slopes{k}.time; 0 T(k)];
+            slopes{k}.time1 = [slopes{k}.time1 0];
+            slopes{k}.time2 = [slopes{k}.time2 T(k)];
             slopes{k}.diff = [slopes{k}.diff (U2-U1)/(T(k)-0)];
         end
         if U4~=U3 && T2~=T(k)
-            slopes{k}.time = [slopes{k}.time; T(k) T2];
+            slopes{k}.time1 = [slopes{k}.time1; T(k)];
+            slopes{k}.time2 = [slopes{k}.time2 T2];
             slopes{k}.diff = [slopes{k}.diff (U4-U3)/(T2-T(k))];
         end
     end

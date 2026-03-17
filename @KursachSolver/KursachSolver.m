@@ -87,5 +87,6 @@ classdef KursachSolver < handle
 
         %--ПУНКТ 1--%
         p1_showSpectrFFT(obj)  % Вывод FFT-расчёта спектров
+        p1_showSignalDiff(obj) % Вывод производных сигнала
     end
 end

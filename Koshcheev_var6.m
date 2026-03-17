@@ -2,10 +2,10 @@ clear;
 clc;
 close all;
 
-U1 = 3;
-U2 = 3;
+U1 = 6;
+U2 = 6;
 U3 = 4;
-U4 = 4;
+U4 = 0;
 T = [1 3 4].*1e-6;
 n = 14;
 m = 40;
@@ -19,3 +19,4 @@ solver = KursachSolver(U1, U2, U3, U4, T, n, m, f_gr, T2);
 solver.dano_showSignal();
 solver.dano_showNoiseSPM();
 solver.p1_showSpectrFFT();
+solver.p1_showSignalDiff();
