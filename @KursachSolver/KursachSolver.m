@@ -59,7 +59,7 @@ classdef KursachSolver < handle
             obj.T2 = T2;
 
             % Генерируем сигнал по дано
-            [obj.time, obj.dt, obj.u, obj.jumps, obj.umax] = dano_createSignal(obj);
+            [obj.time, obj.dt, obj.u, obj.jumps, obj.slopes, obj.umax] = dano_createSignal(obj);
             
             % Генерируем СПМ шума по дано
             [obj.cyclic_freq, obj.noise_SPM, obj.W0, obj.omega_gr_n] = dano_createNoiseSPM(obj);
@@ -72,7 +72,7 @@ classdef KursachSolver < handle
 
     methods (Access=protected)
         %--ДАНО--%
-        [time, dt, u, jumps, umax] = dano_createSignal(obj)    % Создавалка сигнала по дано
+        [time, dt, u, jumps, slopes, umax] = dano_createSignal(obj)    % Создавалка сигнала по дано
         [cyclic_freq, noise_SPM, W0, omega_gr_n] = dano_createNoiseSPM(obj)     % Создавалка СПМ шума по дано
         
         %--ПУНКТ 1--%
