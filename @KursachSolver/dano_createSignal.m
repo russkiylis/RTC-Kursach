@@ -1,4 +1,4 @@
-function [time, dt, u, jumps, umax] = dano_createSignal(obj)
+function [time, dt, u, jumps, slopes, umax] = dano_createSignal(obj)
 %CREATESIGNAL Создавалка сигнала по дано
     
     U1 = obj.U1;
@@ -35,42 +35,41 @@ function [time, dt, u, jumps, umax] = dano_createSignal(obj)
     umax = max(u(1,:));
 
     % Запоминаем, где скачки (ыхыхых скАчки)
-    % Первое измерение - версия графика (для разных T)
-    % Второе измерение - номер скачка
-    % Третье измерение - время и амплитуда скачка
-    jumps = zeros(3,1,2);
-    if U1 > 0
-        jumps(:,1,1) = 0;
-        jumps(:,1,2) = U1;
-    end
-    if U2 ~= U3
-        for k = 1:3
-            jumps(:,2,1) = T';
-            jumps(:,2,2) = U3-U2;
+    jumps = cell(3,1);
+    for k = 1:3
+        jumps{k}.time = [];
+        jumps{k}.amplitude = [];
+
+        if U1 > 0
+            jumps{k}.time = [jumps{k}.time 0]; %#ok<*AGROW>
+            jumps{k}.amplitude = [jumps{k}.amplitude U1];
+        end
+        if U2 ~= U3
+            jumps{k}.time = [jumps{k}.time T(k)];
+            jumps{k}.amplitude = [jumps{k}.amplitude U3-U2];
+        end
+        if U4 > 0
+            jumps{k}.time = [jumps{k}.time T2];
+            jumps{k}.amplitude = [jumps{k}.amplitude -U4];
         end
     end
-    if U4 > 0 && U2 ~=U3
-        jumps(:,3,1) = T2;
-        jumps(:,3,2) = -U4;
-    elseif U4 > 0 && U2 ==U3
-        jumps(:,2,1) = T2;
-        jumps(:,2,2) = -U4;
-    end
-    
 
-    % % Запоминаем где первая производная это константа (в сигнале наклон)
+    % Запоминаем где первая производная это константа (в сигнале наклон)
+    slopes = cell(3,1);
     for k = 1:3
-        i=1;
-        if U2~=U1 && T(k)~=0  
-            obj.slopes(k,i).t1 = 0;
-            obj.slopes(k,i).t2 = T(k);
-            obj.slopes(k,i).diff = (U2-U1)/(T(k)-0);
-            i = i+1;
+        slopes{k}.time1 = [];
+        slopes{k}.time2 = [];
+        slopes{k}.diff = [];
+
+        if U2~=U1 && T(k)~=0
+            slopes{k}.time1 = [slopes{k}.time1 0];
+            slopes{k}.time2 = [slopes{k}.time2 T(k)];
+            slopes{k}.diff = [slopes{k}.diff (U2-U1)/(T(k)-0)];
         end
         if U4~=U3 && T2~=T(k)
-            obj.slopes(k,i).t1 = T(k);
-            obj.slopes(k,i).t2 = T2;
-            obj.slopes(k,i).diff = (U4-U3)/(T2-T(k));
+            slopes{k}.time1 = [slopes{k}.time1; T(k)];
+            slopes{k}.time2 = [slopes{k}.time2 T2];
+            slopes{k}.diff = [slopes{k}.diff (U4-U3)/(T2-T(k))];
         end
     end
 
