@@ -57,7 +57,7 @@ end
 % Легенда
 if ~isempty(h_jumps)
     legend([h_slopes, h_jumps], "От наклона", "От скачка (\delta-функция)", ...
-        Location="northeast");
+        Location="best");
 else
     legend(h_slopes, "От наклона", Location="best");
 end
@@ -142,7 +142,7 @@ if ~isempty(h_jumps2)
     labels{end+1} = "\delta(t) (от скачка)";
 end
 if ~isempty(handles)
-    legend(handles, labels, Location="northeast");
+    legend(handles, labels, Location="best");
 end
 
 grid on;

@@ -21,3 +21,4 @@ solver.dano_showSignal();
 solver.dano_showNoiseSPM();
 solver.p1_showSpectrFFT();
 solver.p1_showSignalDiff();
+solver.p1_showSpectrAnalytical();

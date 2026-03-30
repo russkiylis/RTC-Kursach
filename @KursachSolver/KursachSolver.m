@@ -15,7 +15,7 @@ classdef KursachSolver < handle
         T2;
         
         %--Оси--%
-        N = 10000;  % Количество точек
+        N = 100000;  % Количество точек
         time;   % Ось времени
         cyclic_freq;    % Ось частоты
         freqFFT; % Ось частоты для FFT
@@ -94,5 +94,6 @@ classdef KursachSolver < handle
         %--ПУНКТ 1--%
         p1_showSpectrFFT(obj)  % Вывод FFT-расчёта спектров
         p1_showSignalDiff(obj) % Вывод производных сигнала
+        p1_showSpectrAnalytical(obj)    % Вывод аналитического спектра
     end
 end
