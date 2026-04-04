@@ -74,10 +74,11 @@ for k = 1:length(combined_amps)
     if isempty(sp)
         sp = combined_amps(k).*exp(-1i.*omega.*unique_times(k))./(1i.*omega).^2;
         sp_text = sprintf("%.10g",combined_amps(k))+"\frac{e^{-j\omega"+sprintf("%.10g",unique_times(k))+"}}{(j\omega)^2}";
+        obj.K_SF_text_zveno = sprintf("%.10g",combined_amps(k))+"\frac{e^{j\omega"+sprintf("%.10g",unique_times(k))+"}}{(-j\omega)^2}";
     else
         sp = [sp; combined_amps(k).*exp(-1i.*omega.*unique_times(k))./(1i.*omega).^2];     %#ok<*AGROW>
         sp_text = sp_text+" + "+sprintf("%.10g",combined_amps(k))+"\frac{e^{-j\omega"+sprintf("%.10g",unique_times(k))+"}}{(j\omega)^2}";
-
+        obj.K_SF_text_zveno = [obj.K_SF_text_zveno sprintf("%.10g",combined_amps(k))+"\frac{e^{j\omega"+sprintf("%.10g",unique_times(k))+"}}{(-j\omega)^2}"];
     end
 end
 
@@ -93,9 +94,11 @@ for k = 1:length(jumps.amplitude)
     if isempty(sp)
         sp = jumps.amplitude(k).*exp(-1i.*omega.*jumps.time(k))./(1i.*omega);
         sp_text = sprintf("%.10g",jumps.amplitude(k))+"\frac{e^{-j\omega"+sprintf("%.10g",jumps.time(k))+"}}{j\omega}";
+        obj.K_SF_text_zveno = sprintf("%.10g",jumps.amplitude(k))+"\frac{e^{j\omega"+sprintf("%.10g",jumps.time(k))+"}}{-j\omega}";
     else
         sp = [sp; jumps.amplitude(k).*exp(-1i.*omega.*jumps.time(k))./(1i.*omega)];
         sp_text = sp_text+" + "+sprintf("%.10g",jumps.amplitude(k))+"\frac{e^{-j\omega"+sprintf("%.10g",jumps.time(k))+"}}{j\omega}";
+        obj.K_SF_text_zveno = [obj.K_SF_text_zveno sprintf("%.10g",jumps.amplitude(k))+"\frac{e^{j\omega"+sprintf("%.10g",jumps.time(k))+"}}{-j\omega}"];
     end
 end
 
