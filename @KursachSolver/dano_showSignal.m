@@ -12,17 +12,18 @@ u = obj.u;
 T = obj.T;
 T2 = obj.T2;
 umax = obj.umax;
+m = 1e6;
 
 for k = 1:3
-    figure(name="Сигнал, T1 = "+num2str(T(k))+" с");
+    figure(name="Сигнал, T1 = "+num2str(T(k)*m)+" мкс");
 
     % Рисуем сигнал. Добавляем точки (−T2, 0) слева и (3T2, 0) справа,
     % чтобы линия уходила в ноль за пределами [0, T2].
-    plot([-T2 time 3.*T2], [0 u(k, :) 0], LineWidth=3);
+    plot([-T2 time 3.*T2].*m, [0 u(k, :) 0], LineWidth=3);
     grid on;
 
     % Ограничиваем оси, чтобы было видно весь сигнал с небольшими отступами
-    xlim([-0.1.*T2 1.2.*T2]);
+    xlim([-0.1.*T2.*m 1.2.*T2.*m]);
     ylim([-0.5 1.2.*umax]);
 
     % Помещаем оси X и Y через начало координат (как в учебниках)
@@ -30,8 +31,8 @@ for k = 1:3
     ax.XAxisLocation = 'origin';    % Ось X проходит через y=0
     ax.YAxisLocation = 'origin';    % Ось Y проходит через x=0
 
-    title("Сигнал, T1 = "+num2str(T(k))+" с");
-    xlabel("t, с");
+    title("Сигнал, T1 = "+num2str(T(k)*m)+" мкс");
+    xlabel("t, мкс");
     ylabel("u(t), В");
 end
 
