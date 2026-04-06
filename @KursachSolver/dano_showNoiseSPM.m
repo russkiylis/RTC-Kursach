@@ -13,7 +13,7 @@ noiseSPM = obj.noise_SPM;
 W0 = obj.W0;
 omega_gr_n = obj.omega_gr_n;
 
-figure(name="СПМ шума");
+figure(name="СПМ шума", NumberTitle="off");
 
 % Рисуем СПМ. Добавляем нулевые точки за пределами оси частот,
 % чтобы график корректно уходил в ноль на краях.

@@ -22,15 +22,26 @@ sp_max = max(abs(sp));              % Максимум амплитудного 
 f_sr = -f(find(abs(sp) >= 0.1.*(sp_max),1));
 
 
-figure(name="Аналитический спектр, fгр = " + sprintf("%.2e",f_sr) + " Гц");
-plot(f, abs(sp), LineWidth=2);      % Рисуем амплитудный спектр |S(f)|
-xline([-f_sr f_sr], "--");          % Граничные частоты ±f_гр
-yline(0.1.*(sp_max), "--");         % Уровень 0.1 от максимума
-xlabel("f, Гц");
-ylabel("S(f), В/Гц");
-grid on;
-title("Аналитический спектр, fгр = " + sprintf("%.2e",f_sr) + " Гц");
+figure(name="Аналитический спектр, fгр = " + sprintf("%.2e",f_sr) + " Гц", NumberTitle="off");
+tiledlayout(2, 1);
 
-% Ограничиваем ось частот: ±1.1*f_гр (чтобы было видно главный лепесток)
+% --- Амплитудный спектр ---
+nexttile;
+plot(f, abs(sp), LineWidth=2);
+xline([-f_sr f_sr], "--");
+yline(0.1.*(sp_max), "--");
+xlabel("f, Гц");
+ylabel("|S(f)|, В/Гц");
+grid on;
+title("Амплитудный спектр");
+xlim([0 f_sr.*1.1]);
+
+% --- Фазовый спектр ---
+nexttile;
+plot(f, angle(sp), LineWidth=2);
+xlabel("f, Гц");
+ylabel("\phi_S(f), рад");
+grid on;
+title("Фазовый спектр");
 xlim([0 f_sr.*1.1]);
 end

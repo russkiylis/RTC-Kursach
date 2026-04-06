@@ -10,7 +10,7 @@ function p1_showSpectrFFT(obj)
 %
 % Выбранный вариант сигнала выделен красным цветом.
 
-figure(name="Амплитудные сигналов через БПФ");
+figure(name="Амплитудные сигналов через БПФ", NumberTitle="off");
 tiledlayout(1,3);  % 3 графика в одну строку
 
 for k = 1:3

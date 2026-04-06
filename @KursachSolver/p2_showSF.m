@@ -24,8 +24,7 @@ function p2_showSF(obj)
     sp_max = max(abs(obj.spectrAnalytical));
     f_gr = -f(find(abs(obj.spectrAnalytical) >= 0.1*sp_max, 1));
 
-    figure('Name', 'АЧХ и ФЧХ согласованного фильтра', ...
-           'NumberTitle', 'off', 'Color', 'w');
+    figure(name="АЧХ и ФЧХ согласованного фильтра", NumberTitle="off");
     tiledlayout(2, 1);
 
     % --- АЧХ ---
@@ -130,9 +129,7 @@ function p2_showSF(obj)
     n_cols = 2;
     n_rows = ceil(n_plots / n_cols);
 
-    figure('Name', 'Импульсная характеристика СФ (\delta на входе)', ...
-           'NumberTitle', 'off', 'Color', 'w', ...
-           'Position', [50 50 900 max(400, 200*n_rows)]);
+    figure(name="Импульсная характеристика СФ (дельта на входе)", NumberTitle="off");
 
     t_disp = t_ir / tm;   % ось времени в отображаемых единицах
     xl = [-0.05*T2/tm, 1.3*T2/tm];
@@ -168,7 +165,7 @@ function p2_showSF(obj)
         subplot(n_rows, n_cols, plot_idx);
         plot(t_disp, v_int2/tm, 'LineWidth', 2);
         xlim(xl); addYPadding();
-        xlabel(['t, ' t_unit]);
+        xlabel(['t, ' t_unit]); ylabel('В');
         title([name_int2 ': t \cdot 1(t)  (после 2-го интегратора)'], 'Interpreter', 'tex');
         grid on;
     end

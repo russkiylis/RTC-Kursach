@@ -210,8 +210,7 @@ function drawStructuralDiagram(terms, time_mult)
     end
 
     % --- Создаём фигуру ---
-    fig = figure('Name', 'Структурная схема СФ', 'NumberTitle', 'off', ...
-                 'Color', 'w', 'Position', [100 200 1200 max(300, 150*n_total)]);
+    fig = figure(name="Структурная схема СФ", NumberTitle="off", color='w');
     ax = axes(fig, 'Position', [0.02 0.05 0.96 0.9]);
     hold(ax, 'on');
     axis(ax, 'off');
