@@ -43,5 +43,5 @@ xlabel("f, Гц");
 ylabel("\phi_S(f), рад");
 grid on;
 title("Фазовый спектр");
-xlim([0 f_sr.*1.1]);
+xlim([-f_sr.*1.1 f_sr.*1.1]);
 end
