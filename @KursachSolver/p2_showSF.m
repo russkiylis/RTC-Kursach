@@ -33,7 +33,7 @@ function p2_showSF(obj)
     xlim([0 f_gr_mhz*1.5]);
 
     nexttile;
-    plot(f_mhz, angle(K), 'LineWidth', 2);
+    plot(f_mhz, negativeWrappedPhase(K), 'LineWidth', 2);
     xlabel('f, МГц');
     ylabel('\phi_{K}(f), рад');
     title('ФЧХ согласованного фильтра');
@@ -307,6 +307,11 @@ function unit = timeUnit(tm)
     else
         unit = 'с';
     end
+end
+
+function phi = negativeWrappedPhase(K)
+    phi = angle(K);
+    phi(phi > 0) = phi(phi > 0) - 2*pi;
 end
 
 function addYPadding(y)

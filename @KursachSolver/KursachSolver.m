@@ -147,6 +147,37 @@ classdef KursachSolver < handle
         rectSnrIn               % Отношение сигнал/шум на входе СФ для прямоугольного импульса
         rectSnrOut              % Отношение сигнал/шум на выходе СФ для прямоугольного импульса
         rectSnrGain             % Отношение (С/Ш)_вых/(С/Ш)_вх для прямоугольного импульса
+        rcTauOpt                % Опорная постоянная времени tau0 = 1/f_0.1 (с)
+        rcTauFactors            % Множители для набора tau относительно tau0
+        rcTauValues             % Набор постоянных времени RC-фильтра (с)
+        rcTime                  % Ось времени для выходных сигналов RC-фильтра (с)
+        rcInputSignal           % Входной сигнал на оси rcTime (В)
+        rcOutputSignals         % Выходные сигналы RC-фильтра для разных tau (В), строки соответствуют rcTauValues
+        rcOutputMax             % Максимальные значения выходных сигналов RC-фильтра (В)
+        rcOutputMaxTime         % Моменты достижения максимумов выходных сигналов RC-фильтра (с)
+        rcKValues               % Комплексные коэффициенты передачи RC-фильтра для разных tau
+        rcNoiseSPMOut           % СПМ шума на выходе RC-фильтра для разных tau (В²/Гц)
+        rcNoiseVarOut           % Дисперсия шума на выходе RC-фильтра для разных tau (В²)
+        rcNoiseStdOut           % СКО шума на выходе RC-фильтра для разных tau (В)
+        rcSNR                   % Отношение сигнал/шум на выходе RC-фильтра для разных tau
+        rcSNRPlotTauValues      % Уточнённая сетка tau для графика ОСШ RC-фильтра (с)
+        rcSNRPlotFactors        % Множители уточнённой сетки tau относительно tau0
+        rcSNRPlotValues         % ОСШ RC-фильтра на уточнённой сетке
+        rcSNRMax                % Максимальное отношение сигнал/шум на выходе RC-фильтра
+        rcSNRMaxTau             % Значение tau, при котором достигается максимум rcSNR
+        rcOptTime               % Ось времени для выходного сигнала RC-фильтра при rcSNRMaxTau (с)
+        rcOptOutputSignal       % Выходной сигнал RC-фильтра при rcSNRMaxTau (В)
+        rcOptOutputMax          % Максимум выходного сигнала RC-фильтра при rcSNRMaxTau (В)
+        rcOptOutputMaxTime      % Момент максимума выходного сигнала RC-фильтра при rcSNRMaxTau (с)
+        rcOptK                  % Комплексный коэффициент передачи RC-фильтра при rcSNRMaxTau
+        rcOptNoiseSPMOut        % СПМ шума на выходе RC-фильтра при rcSNRMaxTau (В²/Гц)
+        rcOptNoiseVarOut        % Дисперсия шума на выходе RC-фильтра при rcSNRMaxTau (В²)
+        rcOptNoiseStdOut        % СКО шума на выходе RC-фильтра при rcSNRMaxTau (В)
+        rcRectTime              % Ось времени для прямоугольного импульса на входе RC-фильтра (с)
+        rcRectInput             % Прямоугольный импульс на входе RC-фильтра (В)
+        rcRectOutput            % Выходной сигнал RC-фильтра при прямоугольном импульсе (В)
+        rcRectOutputMax         % Максимум выходного сигнала RC-фильтра при прямоугольном импульсе (В)
+        rcRectOutputMaxTime     % Момент максимума выходного сигнала RC-фильтра при прямоугольном импульсе (с)
 
         % =====================================================================
         % ПАРАМЕТРЫ, СВЯЗАННЫЕ С КФ (ПУНКТ 3.3)
@@ -267,5 +298,12 @@ classdef KursachSolver < handle
         p36_showRectSNR(obj)       % ОСШ для прямоугольного импульса на входе СФ
         p33_showCorrFormulas(obj)  % LaTeX-формула B(τ) и коэффициенты
         p33_verifyCorrFunc(obj)    % Проверки: B(0)=E, сшивка, xcorr, max
+
+        %--ПУНКТ 4 (квазиоптимальный RC-фильтр)--%
+        p41_calcRCResponses(obj, tauValues) % Выходные сигналы RC-фильтра для набора tau
+        p44_calcRCNoiseStats(obj, plotMode) % СПМ, дисперсия и СКО шума на выходе RC-фильтра
+        p45_calcRCSNR(obj)                  % Зависимость отношения сигнал/шум на выходе RC-фильтра от tau
+        p46_showRCOptimalComparison(obj)    % Сравнение оптимального RC-фильтра с СФ
+        p49_showRectRCResponse(obj)         % Выход RC-фильтра при прямоугольном видеоимпульсе
     end
 end

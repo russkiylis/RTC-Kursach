@@ -89,3 +89,17 @@ solver.p35_showRectResponse();
 solver.p36_showRectSNR();
 solver.p33_showCorrFormulas();
 solver.p33_verifyCorrFunc();
+
+% Пункт 4 — квазиоптимальный RC-фильтр
+% Точки tau задаём явно как множители относительно tau0 = 1/f_0.1.
+% Если нужно изменить таблицу для RC-фильтра, меняйте только rcTauFactors.
+rcTauFactors = 0.1:0.1:2.4;
+rcTau0 = 1 / abs(solver.f_gr01_FFT(solver.selectedSignal));
+rcTauValues = rcTauFactors .* rcTau0;
+
+solver.p41_calcRCResponses(rcTauValues);
+solver.p44_calcRCNoiseStats("stats");
+solver.p45_calcRCSNR();
+solver.p46_showRCOptimalComparison();
+solver.p49_showRectRCResponse();
+solver.p44_calcRCNoiseStats("spm");
