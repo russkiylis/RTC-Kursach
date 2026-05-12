@@ -3,15 +3,14 @@ clc;
 close all;
 
 U1 = 8;
-U2 = 2;
-U3 = 4;
-U4 = 2;
+U2 = 6;
+U3 = 2;
+U4 = 0;
 T = [1 2 4].*1e-6;
-n = 16;
+n = 18;
 m = 10;
-f_gr = "max"; % max/min/mid
+f_gr = "min"; % min/max/mid
 T2 = 5e-6;
-
 
 % Объект, который всё посчитает
 solver = KursachSolver(U1, U2, U3, U4, T, n, m, f_gr, T2, 1e-6);
@@ -30,10 +29,5 @@ solver.p2_showSF();
 
 % Пункт 3.3 — КФ согласованного фильтра
 solver.p33_showCorrFunc();
-solver.p32_showOutputNoiseSPM();
-solver.p33_showNoiseStats();
-solver.p34_showSNR();
-solver.p35_showRectResponse();
-solver.p36_showRectSNR();
 solver.p33_showCorrFormulas();
 solver.p33_verifyCorrFunc();

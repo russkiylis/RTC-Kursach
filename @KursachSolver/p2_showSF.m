@@ -1,13 +1,9 @@
 function p2_showSF(obj)
-% P2_SHOWSF — Графики АЧХ/ФЧХ и импульсная характеристика СФ.
+% P2_SHOWSF — графики АЧХ/ФЧХ и временные диаграммы узлов СФ.
 %
-% 1) АЧХ |K_СФ(f)| и ФЧХ φ_K(f) согласованного фильтра.
-% 2) Временные зависимости напряжений в различных точках структурной
-%    схемы СФ при подаче на вход δ(t) — иллюстрация формирования
-%    импульсной характеристики (рис. 3.4 методички).
-%
-% Имена узлов (u_1, u_2, ...) соответствуют меткам на структурной схеме,
-% нарисованной в p2_simplifySF.
+% Временные диаграммы строятся по той же упрощенной структурной схеме,
+% которую рисует p2_simplifySF(): общий первый интегратор, ветви первого
+% порядка и общая ветвь второго порядка для наклонов.
 
     terms = obj.K_SF_simplified_terms;
     if isempty(terms)
@@ -17,212 +13,314 @@ function p2_showSF(obj)
     % =====================================================================
     % ФИГУРА 1: АЧХ и ФЧХ согласованного фильтра
     % =====================================================================
-    f = obj.cyclic_freq ./ (2*pi);       % ω → f (Гц)
+    f = obj.cyclic_freq ./ (2*pi);
+    f_mhz = f .* 1e-6;
     K = obj.K_SF;
 
-    % Определяем граничную частоту для ограничения оси X
     sp_max = max(abs(obj.spectrAnalytical));
     f_gr = -f(find(abs(obj.spectrAnalytical) >= 0.1*sp_max, 1));
+    f_gr_mhz = f_gr .* 1e-6;
 
-    figure(name="АЧХ и ФЧХ согласованного фильтра", NumberTitle="off");
+    figure(name="АЧХ и ФЧХ согласованного фильтра", NumberTitle="off", Color='w');
     tiledlayout(2, 1);
 
-    % --- АЧХ ---
     nexttile;
-    plot(f, abs(K), 'LineWidth', 2);
-    xlabel('f, Гц');
+    plot(f_mhz, abs(K), 'LineWidth', 2);
+    xlabel('f, МГц');
     ylabel('|K_{СФ}(f)|');
     title('АЧХ согласованного фильтра');
     grid on;
-    xlim([0 f_gr*1.5]);
+    xlim([0 f_gr_mhz*1.5]);
 
-    % --- ФЧХ ---
     nexttile;
-    plot(f, angle(K), 'LineWidth', 2);
-    xlabel('f, Гц');
+    plot(f_mhz, angle(K), 'LineWidth', 2);
+    xlabel('f, МГц');
     ylabel('\phi_{K}(f), рад');
     title('ФЧХ согласованного фильтра');
     grid on;
-    xlim([0 f_gr*1.5]);
+    xlim([0 f_gr_mhz*1.5]);
 
     % =====================================================================
-    % ФИГУРА 2: Импульсная характеристика на узлах структурной схемы
+    % ФИГУРА 2: Временные диаграммы по упрощенной схеме
     % =====================================================================
-
     T2 = obj.T2;
     tm = obj.time_mult;
+    t_unit = timeUnit(tm);
 
-    % Единица измерения времени для подписей
-    if tm == 1e-6
-        t_unit = 'мкс';
-    elseif tm == 1e-3
-        t_unit = 'мс';
-    elseif tm == 1e-9
-        t_unit = 'нс';
-    else
-        t_unit = 'с';
-    end
-
-    % Ось времени для импульсной характеристики
     N_ir = 10000;
     t_ir = linspace(-0.05*T2, 1.3*T2, N_ir);
     heav = @(t) double(t >= 0);
 
-    % Разделяем звенья по типам
-    slope_terms = terms([terms.order] == 2);
-    jump_terms  = terms([terms.order] == 1);
-    n_slope = length(slope_terms);
-    n_jump  = length(jump_terms);
+    [nodes, terminal_idx] = buildSimplifiedImpulseNodes(terms, t_ir, heav, tm);
 
-    % --- Имена узлов (та же логика, что в drawStructuralDiagram) ---
-    ni = 1;
-    name_input = sprintf('u_{%d}', ni); ni = ni + 1;
-    name_int1  = sprintf('u_{%d}', ni); ni = ni + 1;
-    if n_slope > 0
-        name_int2 = sprintf('u_{%d}', ni); ni = ni + 1;
-    end
-    name_slopes = cell(1, n_slope);
-    for k = 1:n_slope
-        name_slopes{k} = sprintf('u_{%d}', ni); ni = ni + 1;
-    end
-    name_jumps = cell(1, n_jump);
-    for k = 1:n_jump
-        name_jumps{k} = sprintf('u_{%d}', ni); ni = ni + 1;
-    end
-    name_output = sprintf('u_{%d}', ni);
-
-    % --- Считаем сигналы на каждом узле ---
-
-    % После 1-го интегратора → 1(t)
-    v_int1 = heav(t_ir);
-
-    % После 2-го интегратора → t·1(t)
-    v_int2 = t_ir .* heav(t_ir);
-
-    % Выходы звеньев наклонов
-    v_slope = zeros(n_slope, N_ir);
-    for k = 1:n_slope
-        tau = slope_terms(k).delay;
-        c   = slope_terms(k).coeff;
-        v_slope(k,:) = c .* (t_ir - tau) .* heav(t_ir - tau);
-    end
-
-    % Выходы звеньев скачков
-    v_jump = zeros(n_jump, N_ir);
-    for k = 1:n_jump
-        tau = jump_terms(k).delay;
-        c   = jump_terms(k).coeff;
-        v_jump(k,:) = c .* heav(t_ir - tau);
-    end
-
-    % Суммарный выход
-    v_output = sum(v_slope, 1) + sum(v_jump, 1);
-
-    % Ожидаемый результат: h_S(t) = A·u(T2 - t)
+    % Ожидаемый результат: h_СФ(t) = A*u(T2-t)
     sel = obj.selectedSignal;
     t_sig = obj.time;
     u_sig = obj.u(sel, :);
     v_expected = obj.A .* interp1(t_sig, u_sig, T2 - t_ir, 'linear', 0);
 
-    % --- Определяем количество subplots ---
-    n_plots = 2 + (n_slope > 0) + n_slope + n_jump + 1;
-    n_cols = 2;
-    n_rows = ceil(n_plots / n_cols);
+    if ~isempty(nodes)
+        nodes(end).compare = v_expected;
+        nodes(end).legend1 = 'Сумма ветвей';
+        nodes(end).legend2 = 'A \cdot u(T_2 - t)';
+    end
 
-    figure(name="Импульсная характеристика СФ (дельта на входе)", NumberTitle="off");
-
-    t_disp = t_ir / tm;   % ось времени в отображаемых единицах
+    t_disp = t_ir / tm;
     xl = [-0.05*T2/tm, 1.3*T2/tm];
 
-    plot_idx = 0;
+    input_idx = 1;
+    output_idx = length(nodes);
+    internal_idx = 2:(output_idx-1);
 
-    % --- u_1: δ(t) на входе ---
-    plot_idx = plot_idx + 1;
-    subplot(n_rows, n_cols, plot_idx);
-    hold on;
-    defcolor = [0 0.4470 0.7410];
-    stem(0/tm, 1, '^', 'filled', 'Color', defcolor, 'LineWidth', 2, ...
-        'MarkerSize', 10, 'MarkerFaceColor', defcolor);
-    text(0/tm, 1, '  \delta(t)', 'FontSize', 9, 'FontWeight', 'bold', ...
-        'Color', defcolor);
-    xlim(xl); ylim([-0.1 1.1]);
-    xlabel(['t, ' t_unit]); ylabel('В')
-    title([name_input ': \delta(t)  (вход)'], 'Interpreter', 'tex');
-    grid on;
+    figure(name="Вход СФ (дельта-функция)", NumberTitle="off", Color='w');
+    plotImpulseNode(nodes(input_idx), t_disp, xl, t_unit);
 
-    % --- u_2: после 1-го интегратора → 1(t) ---
-    plot_idx = plot_idx + 1;
-    subplot(n_rows, n_cols, plot_idx);
-    plot(t_disp, v_int1, 'LineWidth', 2);
-    xlim(xl); addYPadding();
-    xlabel(['t, ' t_unit]); ylabel('В');
-    title([name_int1 ': 1(t)  (после 1-го интегратора)'], 'Interpreter', 'tex');
-    grid on;
+    if ~isempty(internal_idx)
+        figure(name="Импульсная характеристика СФ (внутренние узлы схемы)", NumberTitle="off", Color='w');
 
-    % --- u_3: после 2-го интегратора → t·1(t) ---
-    if n_slope > 0
-        plot_idx = plot_idx + 1;
-        subplot(n_rows, n_cols, plot_idx);
-        plot(t_disp, v_int2/tm, 'LineWidth', 2);
-        xlim(xl); addYPadding();
-        xlabel(['t, ' t_unit]); ylabel('В');
-        title([name_int2 ': t \cdot 1(t)  (после 2-го интегратора)'], 'Interpreter', 'tex');
-        grid on;
-    end
+        n_plots = length(internal_idx);
+        n_cols = 2;
+        n_rows = ceil(n_plots / n_cols);
+        tiledlayout(n_rows, n_cols, 'TileSpacing', 'compact', 'Padding', 'compact');
 
-    % --- Звенья наклонов ---
-    for k = 1:n_slope
-        plot_idx = plot_idx + 1;
-        subplot(n_rows, n_cols, plot_idx);
-        plot(t_disp, v_slope(k,:), 'LineWidth', 2);
-        xlim(xl); addYPadding();
-        xlabel(['t, ' t_unit]); ylabel('В');
-
-        tau_disp = slope_terms(k).delay / tm;
-        if abs(slope_terms(k).delay) < 1e-15
-            ttl = sprintf('%s: наклон (\\tau=0)', name_slopes{k});
-        else
-            ttl = sprintf('%s: наклон (\\tau=%.3g %s)', name_slopes{k}, tau_disp, t_unit);
+        for k = internal_idx
+            nexttile;
+            plotImpulseNode(nodes(k), t_disp, xl, t_unit);
         end
-        title(ttl, 'Interpreter', 'tex');
-        grid on;
     end
 
-    % --- Звенья скачков ---
-    for k = 1:n_jump
-        plot_idx = plot_idx + 1;
-        subplot(n_rows, n_cols, plot_idx);
-        plot(t_disp, v_jump(k,:), 'LineWidth', 2);
-        xlim(xl); addYPadding();
-        xlabel(['t, ' t_unit]); ylabel('В');
+    figure(name="Выход СФ (импульсная характеристика)", NumberTitle="off", Color='w');
+    plotImpulseNode(nodes(output_idx), t_disp, xl, t_unit);
 
-        tau_disp = jump_terms(k).delay / tm;
-        if abs(jump_terms(k).delay) < 1e-15
-            ttl = sprintf('%s: скачок (\\tau=0)', name_jumps{k});
-        else
-            ttl = sprintf('%s: скачок (\\tau=%.3g %s)', name_jumps{k}, tau_disp, t_unit);
+    if ~isempty(terminal_idx)
+        disp("Выход СФ формируется как сумма узлов:");
+        names = strings(1, length(terminal_idx));
+        for k = 1:length(terminal_idx)
+            names(k) = string(nodes(terminal_idx(k)).name);
         end
-        title(ttl, 'Interpreter', 'tex');
-        grid on;
+        disp(strjoin(names, " + "));
+    end
+end
+
+function plotImpulseNode(node, t_disp, xl, t_unit)
+    hold on;
+
+    if strcmp(node.kind, 'delta')
+        stem(0, 1, '^', 'filled', 'LineWidth', 2, 'MarkerSize', 9);
+        text(0, 1, '  \delta(t)', 'FontSize', 9, 'FontWeight', 'bold');
+        ylim([-0.1 1.15]);
+    else
+        y = node.value .* node.scale;
+        plot(t_disp, y, 'LineWidth', 2);
+
+        if ~isempty(node.compare)
+            plot(t_disp, node.compare .* node.scale, 'r--', 'LineWidth', 1.5);
+            legend(node.legend1, node.legend2, 'Location', 'best');
+        end
+        addYPadding(y);
     end
 
-    % --- Суммарный выход + сравнение ---
-    plot_idx = plot_idx + 1;
-    subplot(n_rows, n_cols, plot_idx);
-    plot(t_disp, v_output, 'LineWidth', 2);
-    hold on;
-    plot(t_disp, v_expected, 'r--', 'LineWidth', 1.5);
-    xlim(xl); addYPadding();
-    xlabel(['t, ' t_unit]); ylabel('В');
-    title([name_output ': h_{СФ}(t) = A \cdot u(T_2 - t)  (выход)'], 'Interpreter', 'tex');
-    legend('Сумма звеньев', 'A \cdot u(T_2 - t)', 'Location', 'best');
+    xlim(xl);
+    xlabel(['t, ' t_unit]);
+    ylabel(node.ylabel);
+    title([node.name ': ' node.title], 'Interpreter', 'tex');
     grid on;
 end
 
-function addYPadding()
-% Расширяет ylim на ×1.1 от текущего диапазона данных
-    yl = ylim;
-    dy = (yl(2) - yl(1)) * 0.1;
-    if dy == 0, dy = 0.1; end
-    ylim([yl(1) - dy, yl(2) + dy]);
+
+%% ========================================================================
+%  ПОСТРОЕНИЕ СИГНАЛОВ ПО УЗЛАМ УПРОЩЕННОЙ СХЕМЫ
+%  ========================================================================
+
+function [nodes, terminal_idx] = buildSimplifiedImpulseNodes(terms, t, heav, tm)
+    nodes = emptyNodeStruct();
+    terminal_idx = [];
+
+    slope_terms = terms([terms.order] == 2);
+    jump_terms  = terms([terms.order] == 1);
+    [slope_pair, direct_slope, delayed_slope] = findOppositeDelayPair(slope_terms);
+
+    [nodes, ~] = addNode(nodes, 'delta', [], 1, '\delta(t)  (вход)', 'В');
+
+    v_int1 = heav(t);
+    [nodes, ~] = addNode(nodes, 'line', v_int1, 1, '1(t)  (после 1-го интегратора)', 'В');
+
+    % Ветви первого порядка: после общего интегратора.
+    for k = 1:length(jump_terms)
+        term = jump_terms(k);
+        c = term.coeff;
+        tau = term.delay;
+
+        v_gain = c .* v_int1;
+        [nodes, idx_gain] = addNode(nodes, 'line', v_gain, 1, ...
+            [coeffText(term) ' \cdot 1(t)'], 'В');
+
+        if abs(tau) > 1e-15
+            v_delay = c .* heav(t - tau);
+            [nodes, idx_delay] = addNode(nodes, 'line', v_delay, 1, ...
+                [coeffText(term) ' \cdot 1(t-' delayText(term) ')'], 'В');
+            terminal_idx(end+1) = idx_delay; %#ok<AGROW>
+        else
+            terminal_idx(end+1) = idx_gain; %#ok<AGROW>
+        end
+    end
+
+    % Ветви второго порядка: общий второй интегратор.
+    if ~isempty(slope_terms)
+        v_int2 = t .* heav(t);
+        [nodes, ~] = addNode(nodes, 'line', v_int2, 1/tm, ...
+            't \cdot 1(t)  (после 2-го интегратора)', 'В');
+
+        if slope_pair
+            c = direct_slope.coeff;
+            tau = delayed_slope.delay;
+
+            v_gain = c .* v_int2;
+            [nodes, idx_direct] = addNode(nodes, 'line', v_gain, 1, ...
+                [coeffText(direct_slope) ' \cdot t1(t)'], 'В');
+            terminal_idx(end+1) = idx_direct; %#ok<AGROW>
+
+            v_delay = c .* (t - tau) .* heav(t - tau);
+            [nodes, ~] = addNode(nodes, 'line', v_delay, 1, ...
+                [coeffText(direct_slope) ' \cdot (t-' delayText(delayed_slope) ')1(t-' delayText(delayed_slope) ')'], 'В');
+
+            v_inv = -v_delay;
+            [nodes, idx_inv] = addNode(nodes, 'line', v_inv, 1, ...
+                'инверсия задержанной ветви', 'В');
+            terminal_idx(end+1) = idx_inv; %#ok<AGROW>
+        else
+            for k = 1:length(slope_terms)
+                term = slope_terms(k);
+                c = term.coeff;
+                tau = term.delay;
+
+                v_gain = c .* v_int2;
+                [nodes, idx_gain] = addNode(nodes, 'line', v_gain, 1, ...
+                    [coeffText(term) ' \cdot t1(t)'], 'В');
+
+                if abs(tau) > 1e-15
+                    v_delay = c .* (t - tau) .* heav(t - tau);
+                    [nodes, idx_delay] = addNode(nodes, 'line', v_delay, 1, ...
+                        [coeffText(term) ' \cdot (t-' delayText(term) ')1(t-' delayText(term) ')'], 'В');
+                    terminal_idx(end+1) = idx_delay; %#ok<AGROW>
+                else
+                    terminal_idx(end+1) = idx_gain; %#ok<AGROW>
+                end
+            end
+        end
+    end
+
+    v_output = zeros(size(t));
+    for k = 1:length(terminal_idx)
+        v_output = v_output + nodes(terminal_idx(k)).value;
+    end
+
+    [nodes, ~] = addNode(nodes, 'line', v_output, 1, ...
+        'h_{СФ}(t)=A \cdot u(T_2-t)  (выход)', 'В');
+end
+
+function nodes = emptyNodeStruct()
+    nodes = struct('name', {}, 'kind', {}, 'value', {}, 'scale', {}, ...
+        'title', {}, 'ylabel', {}, 'compare', {}, 'legend1', {}, 'legend2', {});
+end
+
+function [nodes, idx] = addNode(nodes, kind, value, scale, title_txt, ylabel_txt)
+    idx = length(nodes) + 1;
+    nodes(idx).name = sprintf('u_{%d}', idx);
+    nodes(idx).kind = kind;
+    nodes(idx).value = value;
+    nodes(idx).scale = scale;
+    nodes(idx).title = title_txt;
+    nodes(idx).ylabel = ylabel_txt;
+    nodes(idx).compare = [];
+    nodes(idx).legend1 = '';
+    nodes(idx).legend2 = '';
+end
+
+function [ok, direct_term, delayed_term] = findOppositeDelayPair(slope_terms)
+    ok = false;
+    direct_term = struct([]);
+    delayed_term = struct([]);
+
+    if length(slope_terms) ~= 2
+        return;
+    end
+
+    coeffs = [slope_terms.coeff];
+    delays = [slope_terms.delay];
+    scale = max(1, max(abs(coeffs)));
+    is_opposite = abs(coeffs(1) + coeffs(2)) < 1e-9 * scale;
+    zero_idx = find(abs(delays) < 1e-15);
+
+    if is_opposite && length(zero_idx) == 1
+        other_idx = 3 - zero_idx;
+        ok = true;
+        direct_term = slope_terms(zero_idx);
+        delayed_term = slope_terms(other_idx);
+    end
+end
+
+function txt = coeffText(term)
+    if isfield(term, 'coeff_label') && ~isempty(term.coeff_label)
+        txt = term.coeff_label;
+    else
+        txt = gainText(term.coeff);
+    end
+end
+
+function txt = delayText(term)
+    if isfield(term, 'delay_label') && ~isempty(term.delay_label)
+        txt = term.delay_label;
+    else
+        txt = sprintf('%.3g', term.delay);
+    end
+end
+
+function txt = gainText(c)
+    if abs(c) < 1e-15
+        txt = '0';
+        return;
+    end
+
+    sign_str = '';
+    if c < 0
+        sign_str = '-';
+    end
+    c = abs(c);
+
+    if c >= 1e4 || c < 1e-2
+        exp_val = floor(log10(c));
+        mantissa = c / 10^exp_val;
+        txt = sprintf('%s%.3g\\cdot10^{%d}', sign_str, mantissa, exp_val);
+    else
+        txt = sprintf('%s%.4g', sign_str, c);
+    end
+end
+
+function unit = timeUnit(tm)
+    if tm == 1e-6
+        unit = 'мкс';
+    elseif tm == 1e-3
+        unit = 'мс';
+    elseif tm == 1e-9
+        unit = 'нс';
+    else
+        unit = 'с';
+    end
+end
+
+function addYPadding(y)
+    yl = [min(y), max(y)];
+    if any(~isfinite(yl))
+        ylim([-1 1]);
+        return;
+    end
+
+    if abs(yl(2) - yl(1)) < 1e-15
+        delta = max(0.1, abs(yl(1))*0.1);
+        ylim([yl(1)-delta, yl(2)+delta]);
+    else
+        delta = (yl(2) - yl(1)) * 0.12;
+        ylim([yl(1)-delta, yl(2)+delta]);
+    end
 end

@@ -10,36 +10,38 @@ function p1_showSpectrFFT(obj)
 %
 % Выбранный вариант сигнала выделен красным цветом.
 
-figure(name="Амплитудные сигналов через БПФ", NumberTitle="off");
+figure(name="Амплитудные сигналов через БПФ", NumberTitle="off", Color='w');
 tiledlayout(1,3);  % 3 графика в одну строку
 
 for k = 1:3
     ASp = abs(obj.spectrFFT(k,:));  % Амплитудный спектр: |S(f)| = abs(S(f))
     freq = obj.freqFFT;             % Ось частоты f (Гц)
+    freq_mhz = freq .* 1e-6;         % Ось частоты f (МГц)
+    ASp_mhz = ASp .* 1e6;            % Амплитудный спектр в В/МГц
     ymax = max(ASp);                % Максимум амплитудного спектра
 
     nexttile;   % Переходим к следующему подграфику
 
     % Выбранный вариант рисуем красным, остальные — синим (цвет по умолчанию)
     if k == obj.selectedSignal
-        plot(freq,ASp, LineWidth=2,Color="r");
+        plot(freq_mhz, ASp_mhz, LineWidth=2, Color="r");
     else
-        plot(freq,ASp, LineWidth=2);
+        plot(freq_mhz, ASp_mhz, LineWidth=2);
     end
 
     % Ограничиваем ось частот: показываем ±1.2 * max(f_гр) для всех вариантов
-    xlim([0 max(obj.f_gr01_FFT')*1.2]);
-    ylim([0 1.1.*ymax]);
+    xlim([0 max(obj.f_gr01_FFT'.*1e-6)*1.2]);
+    ylim([0 1.1.*ymax.*1e6]);
 
     % Пунктирные линии-маркеры:
-    yline(0.1.*ymax, '--');                 % Уровень 0.1 от максимума
-    xline(-obj.f_gr01_FFT(k,1),'--');       % Левая граничная частота (-f_гр)
-    xline(obj.f_gr01_FFT(k,1),'--');        % Правая граничная частота (+f_гр)
+    yline(0.1.*ymax.*1e6, '--');            % Уровень 0.1 от максимума
+    xline(-obj.f_gr01_FFT(k,1)*1e-6,'--');       % Левая граничная частота (-f_гр)
+    xline(obj.f_gr01_FFT(k,1)*1e-6,'--');        % Правая граничная частота (+f_гр)
 
     grid on;
-    title("T = "+num2str(obj.T(k))+" с. fср = "+sprintf("%.2e",obj.f_gr01_FFT(k,1))+" Гц")
-    xlabel("f, Гц");
-    ylabel("S(f), В/Гц");
+    title("T = "+num2str(obj.T(k)*1e6)+" мкс. fср = "+sprintf("%0.2g",obj.f_gr01_FFT(k,1)*1e-6)+" МГц")
+    xlabel("f, МГц");
+    ylabel("S(f), В/МГц");
 end
 
 

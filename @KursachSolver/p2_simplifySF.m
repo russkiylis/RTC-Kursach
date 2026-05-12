@@ -1,19 +1,19 @@
 function p2_simplifySF(obj)
-% P2_SIMPLIFYSF — Упрощает формулу ПФ СФ и рисует структурную схему.
+% P2_SIMPLIFYSF — упрощает ПФ СФ и строит структурные схемы.
 %
-% Каждое звено ПФ СФ имеет вид:
-%   A * coeff * e^{jωt_k} / (-jω)^n * e^{-jωT2}
-%
-% После упрощения:
-%   Для наклонов (n=2): A*c_k * e^{-jω(T2-t_k)} / (jω)²
-%   Для скачков  (n=1): -A*b_k * e^{-jω(T2-t_k)} / (jω)
+% Расчетная модель остается универсальной: каждое звено СФ хранится как
+% coeff * exp(-j*w*delay) / (j*w)^order. По этим звеньям строятся:
+%   1) неупрощенная схема — каждое слагаемое отдельной ветвью;
+%   2) упрощенная схема — общий первый интегратор, общий второй интегратор
+%      для звеньев второго порядка и компактные ветви задержек.
 
     slopes = obj.slopes;
     jumps  = obj.jumps;
     A  = obj.A;
     T2 = obj.T2;
 
-    terms = struct('coeff', {}, 'delay', {}, 'order', {}, 'type', {});
+    terms = struct('coeff', {}, 'delay', {}, 'order', {}, 'type', {}, ...
+        'coeff_label', {}, 'delay_label', {});
 
     % === Звенья от наклонов (порядок 2) ===
     if ~isempty(slopes.diff)
@@ -24,10 +24,12 @@ function p2_simplifySF(obj)
 
         for k = 1:length(combined_amps)
             if abs(combined_amps(k)) < 1e-12, continue; end
-            terms(end+1).coeff = A * combined_amps(k);  %#ok<AGROW>
+            terms(end+1).coeff = A * combined_amps(k); %#ok<AGROW>
             terms(end).delay   = T2 - unique_times(k);
             terms(end).order   = 2;
             terms(end).type    = "slope";
+            terms(end).coeff_label = makeSlopeCoeffLabel(unique_times(k), slopes, obj);
+            terms(end).delay_label = makeDelayLabel(unique_times(k), obj);
         end
     end
 
@@ -35,25 +37,25 @@ function p2_simplifySF(obj)
     if ~isempty(jumps.amplitude)
         for k = 1:length(jumps.amplitude)
             if abs(jumps.amplitude(k)) < 1e-12, continue; end
-            terms(end+1).coeff = -A * jumps.amplitude(k);  %#ok<AGROW>
+            terms(end+1).coeff = -A * jumps.amplitude(k); %#ok<AGROW>
             terms(end).delay   = T2 - jumps.time(k);
             terms(end).order   = 1;
             terms(end).type    = "jump";
+            terms(end).coeff_label = makeJumpCoeffLabel(jumps.time(k), obj);
+            terms(end).delay_label = makeDelayLabel(jumps.time(k), obj);
         end
     end
 
     % === Формирование LaTeX-строки ===
     latex_str = "";
     for k = 1:length(terms)
-        part = formatTerm(terms(k), obj.time_mult);
+        part = formatTerm(terms(k));
         if k == 1
             latex_str = part;
+        elseif terms(k).coeff >= 0
+            latex_str = latex_str + " + " + part;
         else
-            if terms(k).coeff >= 0
-                latex_str = latex_str + " + " + part;
-            else
-                latex_str = latex_str + " " + part;
-            end
+            latex_str = latex_str + " " + part;
         end
     end
 
@@ -71,43 +73,35 @@ function p2_simplifySF(obj)
     disp("Формула (LaTeX):");
     disp(latex_str);
 
-    % === Структурная схема ===
-    drawStructuralDiagram(terms, obj.time_mult);
+    % === Структурные схемы ===
+    drawUnoptimizedDiagram(terms, obj.time_mult);
+    drawSimplifiedDiagram(terms, obj.time_mult);
 end
 
 
 %% ========================================================================
-%  ЛОКАЛЬНЫЕ ФУНКЦИИ
+%  ФОРМАТИРОВАНИЕ
 %  ========================================================================
 
-function str = formatTerm(term, time_mult)
-% Формирует LaTeX-строку для одного упрощённого звена.
+function str = formatTerm(term)
     c = term.coeff;
     tau = term.delay;
-    ord = term.order;
 
-    % Коэффициент — используем красивую запись
     coeff_str = formatCoeff(c);
-
-    % Знаменатель
-    if ord == 2
+    if term.order == 2
         denom = "(j\omega)^2";
     else
         denom = "j\omega";
     end
 
-    % Числитель (экспонента задержки)
     if abs(tau) < 1e-15
-        % Задержка = 0 → e^0 = 1, не пишем экспоненту
         str = coeff_str + "\frac{1}{" + denom + "}";
     else
-        tau_str = formatDelay(tau, time_mult);
-        str = coeff_str + "\frac{e^{-j\omega " + tau_str + "}}{" + denom + "}";
+        str = coeff_str + "\frac{e^{-j\omega " + sprintf("%.4g", tau) + "}}{" + denom + "}";
     end
 end
 
 function str = formatCoeff(c)
-% Красивая запись коэффициента (например, -10^6 A вместо -71429.2652*1000000)
     if c >= 0
         str = sprintf("%.4g", c);
     else
@@ -115,317 +109,44 @@ function str = formatCoeff(c)
     end
 end
 
-function str = formatDelay(tau, time_mult)
-% Красивая запись задержки в секундах
-    str = sprintf("%.4g", tau);
-end
-
-
-%% ========================================================================
-%  РИСОВАНИЕ СТРУКТУРНОЙ СХЕМЫ
-%  ========================================================================
-
-function drawStructuralDiagram(terms, time_mult)
-
-    slope_idx = find([terms.order] == 2);
-    jump_idx  = find([terms.order] == 1);
-    n_slope = length(slope_idx);
-    n_jump  = length(jump_idx);
-    n_total = n_slope + n_jump;
-
-    if n_total == 0, return; end
-
-    % --- Имена узлов (соответствуют графикам импульсной характеристики) ---
-    ni = 1;
-    name_input = sprintf('u_{%d}', ni); ni = ni + 1;
-    name_int1  = sprintf('u_{%d}', ni); ni = ni + 1;
-    if n_slope > 0
-        name_int2 = sprintf('u_{%d}', ni); ni = ni + 1;
-    end
-    name_slopes = cell(1, n_slope);
-    for i = 1:n_slope
-        name_slopes{i} = sprintf('u_{%d}', ni); ni = ni + 1;
-    end
-    name_jumps = cell(1, n_jump);
-    for i = 1:n_jump
-        name_jumps{i} = sprintf('u_{%d}', ni); ni = ni + 1;
-    end
-    name_output = sprintf('u_{%d}', ni);
-
-    % --- Размеры блоков и отступы ---
-    bw = 1.6;   % ширина блока
-    bh = 0.7;   % высота блока
-    gap_x = 0.6; % горизонтальный зазор между блоками
-    gap_y = 1.2; % вертикальный зазор между ветвями
-    arrow_sz = 0.12; % размер стрелки
-
-    % --- Определяем X-координаты колонок ---
-    x_input = 0;
-    x_int1  = x_input + bw/2 + gap_x + bw/2;  % 1-й интегратор
-    x_nodeA = x_int1 + bw/2 + gap_x;           % точка разветвления A
-
-    % Для наклонов: 2-й интегратор
-    x_int2  = x_nodeA + gap_x + bw/2 + 0.5;
-
-    % Усилители и задержки — общие колонки для всех ветвей
-    if n_slope > 0
-        x_amp = x_int2 + bw/2 + gap_x + bw/2;
-    else
-        x_amp = x_nodeA + gap_x + bw/2 + 0.5;
-    end
-    x_delay = x_amp + bw/2 + gap_x + bw/2;
-    x_sum   = x_delay + bw/2 + gap_x + 0.4;
-    x_out   = x_sum + 0.4 + gap_x + 0.5;
-
-    % --- Определяем Y-координаты ветвей ---
-    % Наклоны — сверху, скачки — снизу
-    y_mid = 0;
-    all_y = [];
-    slope_y = [];
-    jump_y  = [];
-    for i = 1:n_slope
-        slope_y(i) = y_mid + (n_slope - i) * gap_y + (n_jump > 0) * gap_y/2;
-    end
-    for i = 1:n_jump
-        jump_y(i) = y_mid - (i) * gap_y + (n_slope == 0) * gap_y * (n_jump - i);
-        if n_slope == 0
-            jump_y(i) = y_mid + (n_jump - i) * gap_y;
-        end
-    end
-
-    % Центрируем по вертикали
-    all_y_vals = [slope_y, jump_y];
-    y_center = mean(all_y_vals);
-    slope_y = slope_y - y_center;
-    jump_y  = jump_y - y_center;
-    y_mid   = y_mid - y_center;
-
-    % Позиция основной шины (вход - инт1 - nodeA)
-    if n_slope > 0 && n_jump > 0
-        y_spine = (min(slope_y) + max(jump_y)) / 2;
-    elseif n_slope > 0
-        y_spine = mean(slope_y);
-    else
-        y_spine = mean(jump_y);
-    end
-
-    % --- Создаём фигуру ---
-    fig = figure(name="Структурная схема СФ", NumberTitle="off", color='w');
-    ax = axes(fig, 'Position', [0.02 0.05 0.96 0.9]);
-    hold(ax, 'on');
-    axis(ax, 'off');
-    axis(ax, 'equal');
-
-    % --- Рисуем основной путь: Вход → 1/jω → nodeA ---
-    drawArrowLine(ax, x_input, y_spine, x_int1 - bw/2, y_spine, arrow_sz);
-    drawBlock(ax, x_int1, y_spine, bw, bh, '1/j\omega');
-    drawArrowLine(ax, x_int1 + bw/2, y_spine, x_nodeA, y_spine, arrow_sz);
-    drawNode(ax, x_nodeA, y_spine);
-    text(ax, x_input - 0.3, y_spine, 'Вход', 'FontSize', 11, ...
-        'HorizontalAlignment', 'right', 'VerticalAlignment', 'middle');
-
-    % Точки-метки узлов u_1 (вход) и u_2 (после 1-го интегратора)
-    x_u1 = (x_input + x_int1 - bw/2) / 2;
-    drawNodeLabel(ax, x_u1, y_spine, name_input);
-    x_u2 = (x_int1 + bw/2 + x_nodeA) / 2;
-    drawNodeLabel(ax, x_u2, y_spine, name_int1);
-
-    % --- Ветвь наклонов: nodeA → 2-й интегратор → nodeB → ветви ---
-    if n_slope > 0
-        y_slope_spine = mean(slope_y);
-
-        % Вертикальная линия от nodeA к slope_spine
-        if abs(y_spine - y_slope_spine) > 0.01
-            line(ax, [x_nodeA x_nodeA], sort([y_spine, y_slope_spine]), ...
-                'Color', 'k', 'LineWidth', 1.5);
-        end
-
-        % Горизонт к 2-му интегратору
-        drawArrowLine(ax, x_nodeA, y_slope_spine, x_int2 - bw/2, y_slope_spine, arrow_sz);
-        drawBlock(ax, x_int2, y_slope_spine, bw, bh, '1/j\omega');
-
-        x_nodeB = x_int2 + bw/2 + gap_x * 0.5;
-        drawArrowLine(ax, x_int2 + bw/2, y_slope_spine, x_nodeB, y_slope_spine, 0);
-        drawNode(ax, x_nodeB, y_slope_spine);
-
-        % Точка-метка u_3 (после 2-го интегратора)
-        drawNodeLabel(ax, x_nodeB, y_slope_spine, name_int2);
-
-        % Вертикальная линия от nodeB к ветвям
-        if n_slope > 1
-            line(ax, [x_nodeB x_nodeB], [min(slope_y), max(slope_y)], ...
-                'Color', 'k', 'LineWidth', 1.5);
-        end
-
-        % Ветви наклонов
-        for i = 1:n_slope
-            k = slope_idx(i);
-            y = slope_y(i);
-
-            % Горизонтальная линия от nodeB к усилителю
-            drawArrowLine(ax, x_nodeB, y, x_amp - bw/2, y, arrow_sz);
-
-            % Усилитель
-            amp_label = formatGainLabel(terms(k).coeff);
-            drawBlock(ax, x_amp, y, bw, bh, amp_label);
-
-            if abs(terms(k).delay) > 1e-15
-                % Задержка
-                delay_label = formatDelayLabel(terms(k).delay, time_mult);
-                drawArrowLine(ax, x_amp + bw/2, y, x_delay - bw/2, y, arrow_sz);
-                drawBlock(ax, x_delay, y, bw, bh, delay_label);
-                drawArrowLine(ax, x_delay + bw/2, y, x_sum, y, arrow_sz);
-                % Точка-метка на выходе звена
-                drawNodeLabel(ax, x_delay + bw/2 + 0.15, y, name_slopes{i});
-            else
-                % Без задержки — прямо к сумматору
-                drawArrowLine(ax, x_amp + bw/2, y, x_sum, y, arrow_sz);
-                drawNodeLabel(ax, x_amp + bw/2 + 0.15, y, name_slopes{i});
-            end
-        end
-    end
-
-    % --- Ветвь скачков: nodeA → ветви (без 2-го интегратора) ---
-    if n_jump > 0
-        % Если есть наклоны, рисуем вертикальную линию от nodeA вниз к скачкам
-        if n_slope > 0
-            y_fork_top = min(y_spine, min(jump_y));
-            y_fork_bot = max(y_spine, max(jump_y));
-            % Линия уже частично проведена к slope_spine, добавим к jump
-            line(ax, [x_nodeA x_nodeA], sort([y_spine, min(jump_y)]), ...
-                'Color', 'k', 'LineWidth', 1.5);
-        end
-
-        if n_jump > 1
-            line(ax, [x_nodeA x_nodeA], [min(jump_y), max(jump_y)], ...
-                'Color', 'k', 'LineWidth', 1.5);
-        end
-
-        % X-координата усилителя для скачков (без 2-го интегратора)
-        if n_slope > 0
-            x_amp_j = x_amp;   % выравниваем с наклонами
-        else
-            x_amp_j = x_amp;
-        end
-
-        for i = 1:n_jump
-            k = jump_idx(i);
-            y = jump_y(i);
-
-            drawArrowLine(ax, x_nodeA, y, x_amp_j - bw/2, y, arrow_sz);
-
-            amp_label = formatGainLabel(terms(k).coeff);
-            drawBlock(ax, x_amp_j, y, bw, bh, amp_label);
-
-            if abs(terms(k).delay) > 1e-15
-                delay_label = formatDelayLabel(terms(k).delay, time_mult);
-                drawArrowLine(ax, x_amp_j + bw/2, y, x_delay - bw/2, y, arrow_sz);
-                drawBlock(ax, x_delay, y, bw, bh, delay_label);
-                drawArrowLine(ax, x_delay + bw/2, y, x_sum, y, arrow_sz);
-                drawNodeLabel(ax, x_delay + bw/2 + 0.15, y, name_jumps{i});
-            else
-                drawArrowLine(ax, x_amp_j + bw/2, y, x_sum, y, arrow_sz);
-                drawNodeLabel(ax, x_amp_j + bw/2 + 0.15, y, name_jumps{i});
-            end
-        end
-    end
-
-    % --- Сумматор ---
-    sum_y = mean([slope_y, jump_y]);
-    drawSummator(ax, x_sum, sum_y, 0.35);
-
-    % Линии от всех ветвей к сумматору (вертикальная сборная шина)
-    all_branch_y = [slope_y, jump_y];
-    if length(all_branch_y) > 1
-        line(ax, [x_sum x_sum], [min(all_branch_y), max(all_branch_y)], ...
-            'Color', 'k', 'LineWidth', 1.5);
-    end
-
-    % --- Выход ---
-    drawArrowLine(ax, x_sum + 0.35, sum_y, x_out, sum_y, arrow_sz);
-    text(ax, x_out + 0.15, sum_y, 'Выход', 'FontSize', 11, ...
-        'HorizontalAlignment', 'left', 'VerticalAlignment', 'middle');
-    drawNodeLabel(ax, (x_sum + 0.35 + x_out) / 2, sum_y, name_output);
-
-    % Подгоняем оси
-    axis(ax, 'tight');
-    xl = xlim(ax); yl = ylim(ax);
-    xlim(ax, [xl(1)-1, xl(2)+1]);
-    ylim(ax, [yl(1)-0.8, yl(2)+0.8]);
-end
-
-
-%% --- Вспомогательные функции рисования ---
-
-function drawBlock(ax, x, y, w, h, label)
-    rectangle(ax, 'Position', [x-w/2, y-h/2, w, h], ...
-        'LineWidth', 1.5, 'FaceColor', [0.95 0.95 1], 'EdgeColor', 'k');
-    text(ax, x, y, label, 'HorizontalAlignment', 'center', ...
-        'VerticalAlignment', 'middle', 'FontSize', 9, 'Interpreter', 'tex');
-end
-
-function drawArrowLine(ax, x1, y1, x2, y2, arrow_sz)
-    line(ax, [x1 x2], [y1 y2], 'Color', 'k', 'LineWidth', 1.5);
-    if arrow_sz > 0
-        % Рисуем стрелку на конце
-        dx = x2 - x1; dy = y2 - y1;
-        len = sqrt(dx^2 + dy^2);
-        if len < 1e-10, return; end
-        ux = dx/len; uy = dy/len;
-        % Два крыла стрелки
-        px = x2 - arrow_sz*ux + arrow_sz*0.4*uy;
-        py = y2 - arrow_sz*uy - arrow_sz*0.4*ux;
-        qx = x2 - arrow_sz*ux - arrow_sz*0.4*uy;
-        qy = y2 - arrow_sz*uy + arrow_sz*0.4*ux;
-        patch(ax, [x2 px qx], [y2 py qy], 'k', 'EdgeColor', 'k');
-    end
-end
-
-function drawNode(ax, x, y)
-    plot(ax, x, y, 'ko', 'MarkerSize', 6, 'MarkerFaceColor', 'k');
-end
-
-function drawNodeLabel(ax, x, y, name)
-% Рисует точку-метку узла с подписью (соответствует графику импульсной х-ки)
-    plot(ax, x, y, 'ko', 'MarkerSize', 5, 'MarkerFaceColor', 'k');
-    text(ax, x, y - 0.35, name, 'FontSize', 10, 'FontWeight', 'bold', ...
-        'HorizontalAlignment', 'center', 'VerticalAlignment', 'top', ...
-        'Interpreter', 'tex', 'Color', [0.1 0.1 0.8]);
-end
-
-function drawSummator(ax, x, y, r)
-    theta = linspace(0, 2*pi, 60);
-    patch(ax, x + r*cos(theta), y + r*sin(theta), 'w', ...
-        'EdgeColor', 'k', 'LineWidth', 1.5);
-    text(ax, x, y, '\Sigma', 'HorizontalAlignment', 'center', ...
-        'VerticalAlignment', 'middle', 'FontSize', 14, 'FontWeight', 'bold');
-end
-
 function str = formatGainLabel(coeff)
-% Формирует надпись для блока усилителя
-    if abs(coeff) >= 1e6
-        exp_val = floor(log10(abs(coeff)));
+    if abs(coeff) < 1e-15
+        str = '0';
+        return;
+    end
+
+    sign_str = '';
+    if coeff < 0
+        sign_str = '-';
+    end
+    coeff = abs(coeff);
+
+    if coeff >= 1e4 || coeff < 1e-2
+        exp_val = floor(log10(coeff));
         mantissa = coeff / 10^exp_val;
-        if abs(mantissa - round(mantissa)) < 0.01
-            str = sprintf('\\times %.0f\\cdot10^{%d}', mantissa, exp_val);
-        else
-            str = sprintf('\\times %.2g\\cdot10^{%d}', mantissa, exp_val);
-        end
-    elseif abs(coeff) < 0.01
-        exp_val = floor(log10(abs(coeff)));
-        mantissa = coeff / 10^exp_val;
-        str = sprintf('\\times %.2g\\cdot10^{%d}', mantissa, exp_val);
+        str = sprintf('%s%.3g\\cdot10^{%d}', sign_str, mantissa, exp_val);
     else
-        if abs(coeff - round(coeff)) < 0.01
-            str = sprintf('\\times %.0f', coeff);
-        else
-            str = sprintf('\\times %.4g', coeff);
-        end
+        str = sprintf('%s%.4g', sign_str, coeff);
+    end
+end
+
+function str = termCoeffLabel(term)
+    if isfield(term, 'coeff_label') && ~isempty(term.coeff_label)
+        str = term.coeff_label;
+    else
+        str = formatGainLabel(term.coeff);
+    end
+end
+
+function str = termDelayLabel(term, time_mult)
+    if isfield(term, 'delay_label') && ~isempty(term.delay_label)
+        str = term.delay_label;
+    else
+        str = formatDelayLabel(term.delay, time_mult);
     end
 end
 
 function str = formatDelayLabel(tau, time_mult)
-% Формирует надпись для блока задержки
     tau_display = tau / time_mult;
     if time_mult == 1e-6
         unit = 'мкс';
@@ -438,9 +159,448 @@ function str = formatDelayLabel(tau, time_mult)
         tau_display = tau;
     end
 
-    if abs(tau_display - round(tau_display)) < 0.001
-        str = sprintf('\\tau = %.0f %s', tau_display, unit);
+    if abs(tau_display - round(tau_display)) < 1e-3
+        str = sprintf('%.0f %s', tau_display, unit);
     else
-        str = sprintf('\\tau = %.3g %s', tau_display, unit);
+        str = sprintf('%.3g %s', tau_display, unit);
     end
+end
+
+function label = makeJumpCoeffLabel(t0, obj)
+    T1 = obj.T(obj.selectedSignal);
+    T2 = obj.T2;
+
+    if isClose(t0, 0)
+        label = '-A U_1';
+    elseif isClose(t0, T1)
+        label = 'A(U_2-U_3)';
+    elseif isClose(t0, T2)
+        label = 'A U_4';
+    else
+        label = '-A \Delta U';
+    end
+end
+
+function label = makeSlopeCoeffLabel(t0, slopes, obj)
+    parts = {};
+
+    for i = 1:length(slopes.diff)
+        base = slopeDiffLabel(slopes.time1(i), slopes.time2(i), obj);
+        if isClose(t0, slopes.time1(i))
+            parts{end+1} = base; %#ok<AGROW>
+        end
+        if isClose(t0, slopes.time2(i))
+            parts{end+1} = negateLabel(base); %#ok<AGROW>
+        end
+    end
+
+    expr = joinSignedLabels(parts);
+    label = prependA(expr);
+end
+
+function label = slopeDiffLabel(t_start, t_end, obj)
+    T1 = obj.T(obj.selectedSignal);
+    T2 = obj.T2;
+
+    if isClose(t_start, 0) && isClose(t_end, T1)
+        if obj.U1 == 0
+            label = 'U_2/T_1';
+        elseif obj.U2 == 0
+            label = '-U_1/T_1';
+        else
+            label = '(U_2-U_1)/T_1';
+        end
+    elseif isClose(t_start, T1) && isClose(t_end, T2)
+        if obj.U4 == 0
+            label = '-U_3/(T_2-T_1)';
+        elseif obj.U3 == 0
+            label = 'U_4/(T_2-T_1)';
+        else
+            label = '(U_4-U_3)/(T_2-T_1)';
+        end
+    else
+        label = 'd_k';
+    end
+end
+
+function label = makeDelayLabel(t0, obj)
+    T1 = obj.T(obj.selectedSignal);
+    T2 = obj.T2;
+
+    if isClose(t0, 0)
+        label = 'T_2';
+    elseif isClose(t0, T1)
+        label = 'T_2-T_1';
+    elseif isClose(t0, T2)
+        label = '0';
+    else
+        label = 'T_2-t_k';
+    end
+end
+
+function out = negateLabel(label)
+    if startsWith(label, '-')
+        out = extractAfter(label, 1);
+        out = char(out);
+    else
+        out = ['-' label];
+    end
+end
+
+function expr = joinSignedLabels(parts)
+    if isempty(parts)
+        expr = '0';
+        return;
+    end
+
+    expr = '';
+    for i = 1:length(parts)
+        part = parts{i};
+        is_neg = startsWith(part, '-');
+        if is_neg
+            part = char(extractAfter(part, 1));
+        end
+
+        if i == 1
+            if is_neg
+                expr = ['-' part];
+            else
+                expr = part;
+            end
+        elseif is_neg
+            expr = [expr ' - ' part]; %#ok<AGROW>
+        else
+            expr = [expr ' + ' part]; %#ok<AGROW>
+        end
+    end
+end
+
+function label = prependA(expr)
+    if strcmp(expr, '0')
+        label = '0';
+    elseif startsWith(expr, '-')
+        label = ['-A ' char(extractAfter(expr, 1))];
+    elseif contains(expr, ' + ') || contains(expr, ' - ')
+        label = ['A(' expr ')'];
+    else
+        label = ['A ' expr];
+    end
+end
+
+function tf = isClose(a, b)
+    tf = abs(a - b) < 1e-12;
+end
+
+
+%% ========================================================================
+%  НЕУПРОЩЕННАЯ СХЕМА
+%  ========================================================================
+
+function drawUnoptimizedDiagram(terms, time_mult)
+    if isempty(terms), return; end
+
+    jump_terms = terms([terms.order] == 1);
+    slope_terms = terms([terms.order] == 2);
+    terms = [jump_terms, slope_terms];
+
+    n = length(terms);
+    y_step = 1.6;
+    y_vals = ((n-1)/2:-1:-(n-1)/2) * y_step;
+
+    fig = figure(name="Неупрощённая структурная схема СФ", NumberTitle="off", color='w');
+    ax = axes('Parent', fig, 'Position', [0.02 0.05 0.96 0.9]);
+    hold(ax, 'on');
+    axis(ax, 'off');
+    axis(ax, 'equal');
+
+    x_in = 0;
+    x_bus = 1.0;
+    x_amp = 2.0;
+    x_int1 = 3.35;
+    x_int2 = 4.6;
+    x_delay = 6.15;
+    x_join = 8.2;
+    x_sum = 9.15;
+    y_mid = 0;
+
+    drawArrowLine(ax, x_in, y_mid, x_bus, y_mid);
+    text(ax, x_in - 0.15, y_mid, 'Вход', 'FontSize', 12, ...
+        'HorizontalAlignment', 'right', 'VerticalAlignment', 'middle');
+    drawNode(ax, x_bus, y_mid);
+    line(ax, [x_bus x_bus], [min(y_vals) max(y_vals)], 'Color', 'k', 'LineWidth', 1.5);
+
+    for i = 1:n
+        y = y_vals(i);
+        x = x_bus;
+
+        drawArrowLine(ax, x, y, x_amp - 0.55, y);
+        drawAmplifier(ax, x_amp, y, termCoeffLabel(terms(i)));
+        x = x_amp + 0.65;
+
+        drawArrowLine(ax, x, y, x_int1 - 0.35, y);
+        drawIntegrator(ax, x_int1, y);
+        x = x_int1 + 0.35;
+
+        if terms(i).order == 2
+            drawArrowLine(ax, x, y, x_int2 - 0.35, y);
+            drawIntegrator(ax, x_int2, y);
+            x = x_int2 + 0.35;
+        end
+
+        if abs(terms(i).delay) > 1e-15
+            drawArrowLine(ax, x, y, x_delay - 0.45, y);
+            drawDelay(ax, x_delay, y, termDelayLabel(terms(i), time_mult));
+            x = x_delay + 0.45;
+        end
+
+        drawArrowLine(ax, x, y, x_join, y);
+        line(ax, [x_join x_sum-0.35], [y y_mid], 'Color', 'k', 'LineWidth', 1.5);
+    end
+
+    drawSummator(ax, x_sum, y_mid);
+    drawArrowLine(ax, x_sum + 0.45, y_mid, x_sum + 1.25, y_mid);
+    text(ax, x_sum + 1.4, y_mid, 'Выход', 'FontSize', 12, ...
+        'HorizontalAlignment', 'left', 'VerticalAlignment', 'middle');
+
+    axis(ax, 'tight');
+    padAxes(ax, 0.7);
+end
+
+
+%% ========================================================================
+%  УПРОЩЕННАЯ СХЕМА
+%  ========================================================================
+
+function drawSimplifiedDiagram(terms, time_mult)
+    if isempty(terms), return; end
+
+    slope_terms = terms([terms.order] == 2);
+    jump_terms  = terms([terms.order] == 1);
+
+    [slope_pair, direct_slope, delayed_slope] = findOppositeDelayPair(slope_terms);
+
+    n_jump = length(jump_terms);
+    n_slope_lines = max(1, length(slope_terms));
+    if slope_pair
+        n_slope_lines = 2; % прямой и задержанный выход после общего усилителя
+    end
+
+    y_jump = [];
+    if n_jump > 0
+        y_jump = linspace(2.3, 0.9, n_jump);
+    end
+    y_slope_center = -1.6;
+    y_slope_top = y_slope_center + 0.7;
+    y_slope_bottom = y_slope_center - 0.7;
+
+    fig = figure(name="Упрощённая структурная схема СФ", NumberTitle="off", color='w');
+    ax = axes('Parent', fig, 'Position', [0.02 0.05 0.96 0.9]);
+    hold(ax, 'on');
+    axis(ax, 'off');
+    axis(ax, 'equal');
+
+    x_in = 0;
+    x_int1 = 1.5;
+    x_split = 2.5;
+    x_jump_amp = 3.6;
+    x_jump_delay = 5.0;
+    x_int2 = 3.5;
+    x_slope_amp = 4.8;
+    x_slope_delay = 6.3;
+    x_slope_inv = 7.45;
+    x_join = 8.5;
+    x_sum = 9.35;
+    y_main = 0;
+
+    node_id = 1;
+    drawArrowLine(ax, x_in, y_main, x_int1 - 0.35, y_main);
+    text(ax, x_in - 0.15, y_main, 'Вход', 'FontSize', 12, ...
+        'HorizontalAlignment', 'right', 'VerticalAlignment', 'middle');
+    drawNodeLabel(ax, (x_in + x_int1 - 0.35)/2, y_main, node_id); node_id = node_id + 1;
+
+    drawIntegrator(ax, x_int1, y_main);
+    drawArrowLine(ax, x_int1 + 0.35, y_main, x_split, y_main);
+    drawNode(ax, x_split, y_main);
+    drawNodeLabel(ax, (x_int1 + 0.35 + x_split)/2, y_main, node_id); node_id = node_id + 1;
+
+    if isempty(slope_terms)
+        y_all = y_jump;
+    else
+        y_all = [y_jump, y_slope_center];
+    end
+    line(ax, [x_split x_split], [min(y_all)-0.2 max(y_all)+0.2], 'Color', 'k', 'LineWidth', 1.5);
+
+    % Ветви первого порядка (скачки)
+    for i = 1:n_jump
+        y = y_jump(i);
+        drawArrowLine(ax, x_split, y, x_jump_amp - 0.55, y);
+        drawAmplifier(ax, x_jump_amp, y, termCoeffLabel(jump_terms(i)));
+        drawNodeLabel(ax, x_jump_amp + 0.72, y, node_id); node_id = node_id + 1;
+
+        if abs(jump_terms(i).delay) > 1e-15
+            drawArrowLine(ax, x_jump_amp + 0.65, y, x_jump_delay - 0.45, y);
+            drawDelay(ax, x_jump_delay, y, termDelayLabel(jump_terms(i), time_mult));
+            drawArrowLine(ax, x_jump_delay + 0.45, y, x_join, y);
+            drawNodeLabel(ax, x_jump_delay + 0.65, y, node_id); node_id = node_id + 1;
+        else
+            drawArrowLine(ax, x_jump_amp + 0.65, y, x_join, y);
+        end
+        line(ax, [x_join x_sum-0.35], [y 0], 'Color', 'k', 'LineWidth', 1.5);
+    end
+
+    % Ветви второго порядка (наклоны)
+    if ~isempty(slope_terms)
+        drawArrowLine(ax, x_split, y_slope_center, x_int2 - 0.35, y_slope_center);
+        drawIntegrator(ax, x_int2, y_slope_center);
+        drawNodeLabel(ax, x_int2 + 0.55, y_slope_center, node_id); node_id = node_id + 1;
+
+        if slope_pair
+            drawArrowLine(ax, x_int2 + 0.35, y_slope_center, x_slope_amp - 0.55, y_slope_center);
+            drawAmplifier(ax, x_slope_amp, y_slope_center, termCoeffLabel(direct_slope));
+            drawNodeLabel(ax, x_slope_amp + 0.72, y_slope_center, node_id); node_id = node_id + 1;
+
+            x_after_amp = x_slope_amp + 0.65;
+            line(ax, [x_after_amp x_after_amp], [y_slope_top y_slope_bottom], 'Color', 'k', 'LineWidth', 1.5);
+
+            % Прямая ветвь
+            drawArrowLine(ax, x_after_amp, y_slope_bottom, x_join, y_slope_bottom);
+            line(ax, [x_join x_sum-0.35], [y_slope_bottom 0], 'Color', 'k', 'LineWidth', 1.5);
+
+            % Задержанная ветвь с инверсией
+            drawArrowLine(ax, x_after_amp, y_slope_top, x_slope_delay - 0.45, y_slope_top);
+            drawDelay(ax, x_slope_delay, y_slope_top, termDelayLabel(delayed_slope, time_mult));
+            drawNodeLabel(ax, x_slope_delay + 0.62, y_slope_top, node_id); node_id = node_id + 1;
+            drawArrowLine(ax, x_slope_delay + 0.45, y_slope_top, x_slope_inv - 0.55, y_slope_top);
+            drawAmplifier(ax, x_slope_inv, y_slope_top, '-1');
+            drawArrowLine(ax, x_slope_inv + 0.65, y_slope_top, x_join, y_slope_top);
+            drawNodeLabel(ax, x_slope_inv + 0.82, y_slope_top, node_id); node_id = node_id + 1;
+            line(ax, [x_join x_sum-0.35], [y_slope_top 0], 'Color', 'k', 'LineWidth', 1.5);
+        else
+            y_branch = linspace(y_slope_center + (n_slope_lines-1)*0.65, ...
+                                y_slope_center - (n_slope_lines-1)*0.65, n_slope_lines);
+            line(ax, [x_int2+0.35 x_int2+0.35], [min(y_branch) max(y_branch)], 'Color', 'k', 'LineWidth', 1.5);
+
+            for i = 1:length(slope_terms)
+                y = y_branch(i);
+                drawArrowLine(ax, x_int2 + 0.35, y, x_slope_amp - 0.55, y);
+                drawAmplifier(ax, x_slope_amp, y, termCoeffLabel(slope_terms(i)));
+                drawNodeLabel(ax, x_slope_amp + 0.72, y, node_id); node_id = node_id + 1;
+
+                if abs(slope_terms(i).delay) > 1e-15
+                    drawArrowLine(ax, x_slope_amp + 0.65, y, x_slope_delay - 0.45, y);
+                    drawDelay(ax, x_slope_delay, y, termDelayLabel(slope_terms(i), time_mult));
+                    drawArrowLine(ax, x_slope_delay + 0.45, y, x_join, y);
+                    drawNodeLabel(ax, x_slope_delay + 0.65, y, node_id); node_id = node_id + 1;
+                else
+                    drawArrowLine(ax, x_slope_amp + 0.65, y, x_join, y);
+                end
+                line(ax, [x_join x_sum-0.35], [y 0], 'Color', 'k', 'LineWidth', 1.5);
+            end
+        end
+    end
+
+    drawSummator(ax, x_sum, 0);
+    drawArrowLine(ax, x_sum + 0.45, 0, x_sum + 1.25, 0);
+    drawNodeLabel(ax, x_sum + 0.85, 0, node_id);
+    text(ax, x_sum + 1.4, 0, 'Выход', 'FontSize', 12, ...
+        'HorizontalAlignment', 'left', 'VerticalAlignment', 'middle');
+
+    axis(ax, 'tight');
+    padAxes(ax, 0.8);
+end
+
+function [ok, direct_term, delayed_term] = findOppositeDelayPair(slope_terms)
+    ok = false;
+    direct_term = struct([]);
+    delayed_term = struct([]);
+
+    if length(slope_terms) ~= 2
+        return;
+    end
+
+    coeffs = [slope_terms.coeff];
+    delays = [slope_terms.delay];
+    scale = max(1, max(abs(coeffs)));
+    is_opposite = abs(coeffs(1) + coeffs(2)) < 1e-9 * scale;
+    zero_idx = find(abs(delays) < 1e-15);
+
+    if is_opposite && length(zero_idx) == 1
+        other_idx = 3 - zero_idx;
+        ok = true;
+        direct_term = slope_terms(zero_idx);
+        delayed_term = slope_terms(other_idx);
+    end
+end
+
+
+%% ========================================================================
+%  ПРИМИТИВЫ РИСОВАНИЯ
+%  ========================================================================
+
+function drawIntegrator(ax, x, y)
+    rectangle(ax, 'Position', [x-0.35, y-0.35, 0.7, 0.7], ...
+        'LineWidth', 1.5, 'FaceColor', 'w', 'EdgeColor', 'k');
+    text(ax, x, y, '\int', 'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'middle', 'FontSize', 18, 'Interpreter', 'tex');
+end
+
+function drawDelay(ax, x, y, label)
+    rectangle(ax, 'Position', [x-0.45, y-0.35, 0.9, 0.7], ...
+        'LineWidth', 1.5, 'FaceColor', 'w', 'EdgeColor', 'k');
+    text(ax, x, y, label, 'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'middle', 'FontSize', 10, 'Interpreter', 'tex');
+end
+
+function drawAmplifier(ax, x, y, label)
+    px = [x-0.55, x-0.55, x+0.65];
+    py = [y-0.45, y+0.45, y];
+    patch(ax, px, py, 'w', 'EdgeColor', 'k', 'LineWidth', 1.5);
+    text(ax, x, y+0.6, label, 'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', 'FontSize', 10, 'Interpreter', 'tex');
+end
+
+function drawSummator(ax, x, y)
+    r = 0.42;
+    theta = linspace(0, 2*pi, 80);
+    patch(ax, x + r*cos(theta), y + r*sin(theta), 'w', ...
+        'EdgeColor', 'k', 'LineWidth', 1.5);
+    text(ax, x, y, '\Sigma', 'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'middle', 'FontSize', 16, 'FontWeight', 'bold');
+end
+
+function drawNode(ax, x, y)
+    plot(ax, x, y, 'ko', 'MarkerSize', 5, 'MarkerFaceColor', 'k');
+end
+
+function drawNodeLabel(ax, x, y, idx)
+    plot(ax, x, y, 'ko', 'MarkerSize', 4.5, 'MarkerFaceColor', 'k');
+    text(ax, x, y - 0.32, sprintf('u_{%d}', idx), ...
+        'FontSize', 10, 'FontWeight', 'bold', ...
+        'HorizontalAlignment', 'center', 'VerticalAlignment', 'top', ...
+        'Interpreter', 'tex', 'Color', [0.1 0.1 0.8]);
+end
+
+function drawArrowLine(ax, x1, y1, x2, y2)
+    line(ax, [x1 x2], [y1 y2], 'Color', 'k', 'LineWidth', 1.5);
+    dx = x2 - x1;
+    dy = y2 - y1;
+    len = sqrt(dx^2 + dy^2);
+    if len < 1e-12
+        return;
+    end
+    ux = dx / len;
+    uy = dy / len;
+    arrow_sz = 0.12;
+    px = x2 - arrow_sz*ux + arrow_sz*0.45*uy;
+    py = y2 - arrow_sz*uy - arrow_sz*0.45*ux;
+    qx = x2 - arrow_sz*ux - arrow_sz*0.45*uy;
+    qy = y2 - arrow_sz*uy + arrow_sz*0.45*ux;
+    patch(ax, [x2 px qx], [y2 py qy], 'k', 'EdgeColor', 'k');
+end
+
+function padAxes(ax, pad)
+    xl = xlim(ax);
+    yl = ylim(ax);
+    xlim(ax, [xl(1)-pad, xl(2)+pad]);
+    ylim(ax, [yl(1)-pad, yl(2)+pad]);
 end

@@ -26,3 +26,8 @@ solver.p1_showSpectrAnalytical();
 solver.p2_createSF();
 solver.p2_simplifySF();
 solver.p2_showSF();
+
+% Пункт 3.3 — КФ согласованного фильтра
+solver.p33_showCorrFunc();
+solver.p33_showCorrFormulas();
+solver.p33_verifyCorrFunc();

@@ -68,6 +68,8 @@ solver = KursachSolver(U1, U2, U3, U4, T, n, m, f_gr, T2, 1e-6);
 solver.dano_showSignal();
 solver.dano_showNoiseSPM();
 
+% solver.p1_showSignalDiffSchematic();
+
 % Пункт 1 - спектры
 solver.p1_showSpectrFFT();
 solver.p1_showSignalDiff();
@@ -77,3 +79,13 @@ solver.p1_showSpectrAnalytical();
 solver.p2_createSF();
 solver.p2_simplifySF();
 solver.p2_showSF();
+
+% Пункт 3 — выходной сигнал, шум и прямоугольный импульс на входе СФ
+solver.p33_showCorrFunc();
+solver.p32_showOutputNoiseSPM();
+solver.p33_showNoiseStats();
+solver.p34_showSNR();
+solver.p35_showRectResponse();
+solver.p36_showRectSNR();
+solver.p33_showCorrFormulas();
+solver.p33_verifyCorrFunc();
