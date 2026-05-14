@@ -16,6 +16,7 @@ function p2_showSF(obj)
     f = obj.cyclic_freq ./ (2*pi);
     f_mhz = f .* 1e-6;
     K = obj.K_SF;
+    pos = f >= 0;
 
     sp_max = max(abs(obj.spectrAnalytical));
     f_gr = -f(find(abs(obj.spectrAnalytical) >= 0.1*sp_max, 1));
@@ -25,7 +26,7 @@ function p2_showSF(obj)
     tiledlayout(2, 1);
 
     nexttile;
-    plot(f_mhz, abs(K), 'LineWidth', 2);
+    plot(f_mhz(pos), abs(K(pos)), 'LineWidth', 2);
     xlabel('f, МГц');
     ylabel('|K_{СФ}(f)|');
     title('АЧХ согласованного фильтра');
@@ -33,7 +34,7 @@ function p2_showSF(obj)
     xlim([0 f_gr_mhz*1.5]);
 
     nexttile;
-    plot(f_mhz, negativeWrappedPhase(K), 'LineWidth', 2);
+    plot(f_mhz(pos), unwrap(angle(K(pos))), 'LineWidth', 2);
     xlabel('f, МГц');
     ylabel('\phi_{K}(f), рад');
     title('ФЧХ согласованного фильтра');
@@ -145,24 +146,24 @@ function [nodes, terminal_idx] = buildSimplifiedImpulseNodes(terms, t, heav, tm)
     v_int1 = heav(t);
     [nodes, ~] = addNode(nodes, 'line', v_int1, 1, '1(t)  (после 1-го интегратора)', 'В');
 
-    % Ветви первого порядка: после общего интегратора.
+    % Ветви первого порядка: в упрощённой схеме сначала используется общая
+    % линия задержки с отводами, а затем масштабные преобразователи.
+    % Поэтому на диаграммах узлы этих ветвей уже должны быть задержанными.
     for k = 1:length(jump_terms)
         term = jump_terms(k);
         c = term.coeff;
         tau = term.delay;
 
-        v_gain = c .* v_int1;
-        [nodes, idx_gain] = addNode(nodes, 'line', v_gain, 1, ...
-            [coeffText(term) ' \cdot 1(t)'], 'В');
-
         if abs(tau) > 1e-15
-            v_delay = c .* heav(t - tau);
-            [nodes, idx_delay] = addNode(nodes, 'line', v_delay, 1, ...
+            v_branch = c .* heav(t - tau);
+            [nodes, idx_branch] = addNode(nodes, 'line', v_branch, 1, ...
                 [coeffText(term) ' \cdot 1(t-' delayText(term) ')'], 'В');
-            terminal_idx(end+1) = idx_delay; %#ok<AGROW>
         else
-            terminal_idx(end+1) = idx_gain; %#ok<AGROW>
+            v_branch = c .* v_int1;
+            [nodes, idx_branch] = addNode(nodes, 'line', v_branch, 1, ...
+                [coeffText(term) ' \cdot 1(t)'], 'В');
         end
+        terminal_idx(end+1) = idx_branch; %#ok<AGROW>
     end
 
     % Ветви второго порядка: общий второй интегратор.
@@ -194,17 +195,19 @@ function [nodes, terminal_idx] = buildSimplifiedImpulseNodes(terms, t, heav, tm)
                 c = term.coeff;
                 tau = term.delay;
 
-                v_gain = c .* v_int2;
-                [nodes, idx_gain] = addNode(nodes, 'line', v_gain, 1, ...
-                    [coeffText(term) ' \cdot t1(t)'], 'В');
-
                 if abs(tau) > 1e-15
-                    v_delay = c .* (t - tau) .* heav(t - tau);
-                    [nodes, idx_delay] = addNode(nodes, 'line', v_delay, 1, ...
+                    % В универсальной упрощённой схеме ветви второго
+                    % порядка также могут использовать общую линию задержки
+                    % с отводами, а масштабный блок стоит после отвода.
+                    v_branch = c .* (t - tau) .* heav(t - tau);
+                    [nodes, idx_branch] = addNode(nodes, 'line', v_branch, 1, ...
                         [coeffText(term) ' \cdot (t-' delayText(term) ')1(t-' delayText(term) ')'], 'В');
-                    terminal_idx(end+1) = idx_delay; %#ok<AGROW>
+                    terminal_idx(end+1) = idx_branch; %#ok<AGROW>
                 else
-                    terminal_idx(end+1) = idx_gain; %#ok<AGROW>
+                    v_branch = c .* v_int2;
+                    [nodes, idx_branch] = addNode(nodes, 'line', v_branch, 1, ...
+                        [coeffText(term) ' \cdot t1(t)'], 'В');
+                    terminal_idx(end+1) = idx_branch; %#ok<AGROW>
                 end
             end
         end
@@ -307,11 +310,6 @@ function unit = timeUnit(tm)
     else
         unit = 'с';
     end
-end
-
-function phi = negativeWrappedPhase(K)
-    phi = angle(K);
-    phi(phi > 0) = phi(phi > 0) - 2*pi;
 end
 
 function addYPadding(y)

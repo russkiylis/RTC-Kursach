@@ -5,7 +5,8 @@ function p2_simplifySF(obj)
 % coeff * exp(-j*w*delay) / (j*w)^order. По этим звеньям строятся:
 %   1) неупрощенная схема — каждое слагаемое отдельной ветвью;
 %   2) упрощенная схема — общий первый интегратор, общий второй интегратор
-%      для звеньев второго порядка и компактные ветви задержек.
+%      для звеньев второго порядка и компактные линии задержки с отводами
+%      для групп однотипных ветвей.
 
     slopes = obj.slopes;
     jumps  = obj.jumps;
@@ -173,7 +174,13 @@ function label = makeJumpCoeffLabel(t0, obj)
     if isClose(t0, 0)
         label = '-A U_1';
     elseif isClose(t0, T1)
-        label = 'A(U_2-U_3)';
+        if isClose(obj.U2, obj.U1)
+            % Для горизонтального первого участка U2 = U1; такая запись
+            % не конфликтует с обозначением узла u_2 на структурной схеме.
+            label = 'A(U_1-U_3)';
+        else
+            label = 'A(U_2-U_3)';
+        end
     elseif isClose(t0, T2)
         label = 'A U_4';
     else
@@ -385,9 +392,10 @@ function drawSimplifiedDiagram(terms, time_mult)
         n_slope_lines = 2; % прямой и задержанный выход после общего усилителя
     end
 
+    y_jump_center = 2.15;
     y_jump = [];
     if n_jump > 0
-        y_jump = linspace(2.3, 0.9, n_jump);
+        y_jump = linspace(2.9, 1.25, n_jump);
     end
     y_slope_center = -1.6;
     y_slope_top = y_slope_center + 0.7;
@@ -402,14 +410,18 @@ function drawSimplifiedDiagram(terms, time_mult)
     x_in = 0;
     x_int1 = 1.5;
     x_split = 2.5;
-    x_jump_amp = 3.6;
-    x_jump_delay = 5.0;
+    x_jump_delay_start = 3.25;
+    x_jump_delay_end = 5.65;
+    x_jump_amp = 6.85;
     x_int2 = 3.5;
     x_slope_amp = 4.8;
+    x_slope_tap_start = 4.45;
+    x_slope_tap_end = 6.65;
+    x_slope_tap_amp = 7.65;
     x_slope_delay = 6.3;
     x_slope_inv = 7.45;
-    x_join = 8.5;
-    x_sum = 9.35;
+    x_join = 8.7;
+    x_sum = 9.55;
     y_main = 0;
 
     node_id = 1;
@@ -423,29 +435,65 @@ function drawSimplifiedDiagram(terms, time_mult)
     drawNode(ax, x_split, y_main);
     drawNodeLabel(ax, (x_int1 + 0.35 + x_split)/2, y_main, node_id); node_id = node_id + 1;
 
-    if isempty(slope_terms)
-        y_all = y_jump;
-    else
-        y_all = [y_jump, y_slope_center];
+    y_all = [];
+    if n_jump > 0
+        y_all = [y_all, y_jump_center, y_jump]; %#ok<AGROW>
+    end
+    if ~isempty(slope_terms)
+        y_all = [y_all, y_slope_center]; %#ok<AGROW>
+    end
+    if isempty(y_all)
+        y_all = y_main;
     end
     line(ax, [x_split x_split], [min(y_all)-0.2 max(y_all)+0.2], 'Color', 'k', 'LineWidth', 1.5);
 
-    % Ветви первого порядка (скачки)
-    for i = 1:n_jump
-        y = y_jump(i);
-        drawArrowLine(ax, x_split, y, x_jump_amp - 0.55, y);
-        drawAmplifier(ax, x_jump_amp, y, termCoeffLabel(jump_terms(i)));
-        drawNodeLabel(ax, x_jump_amp + 0.72, y, node_id); node_id = node_id + 1;
+    % Ветви первого порядка (скачки): общий интегратор и общая линия
+    % задержки с отводами. Масштабные блоки перенесены после задержек,
+    % так как усиление и задержка для линейной цепи коммутируют.
+    if n_jump > 0
+        delays = [jump_terms.delay];
+        max_delay = max(delays);
+        use_tapped_delay = max_delay > 1e-15;
 
-        if abs(jump_terms(i).delay) > 1e-15
-            drawArrowLine(ax, x_jump_amp + 0.65, y, x_jump_delay - 0.45, y);
-            drawDelay(ax, x_jump_delay, y, termDelayLabel(jump_terms(i), time_mult));
-            drawArrowLine(ax, x_jump_delay + 0.45, y, x_join, y);
-            drawNodeLabel(ax, x_jump_delay + 0.65, y, node_id); node_id = node_id + 1;
-        else
-            drawArrowLine(ax, x_jump_amp + 0.65, y, x_join, y);
+        if use_tapped_delay
+            drawArrowLine(ax, x_split, y_jump_center, x_jump_delay_start, y_jump_center);
+            [~, idx_max_delay] = max(delays);
+            drawTappedDelay(ax, x_jump_delay_start, x_jump_delay_end, y_jump_center, ...
+                termDelayLabel(jump_terms(idx_max_delay), time_mult));
+
+            unique_delays = unique(round(delays ./ 1e-15) .* 1e-15);
+            for k = 1:length(unique_delays)
+                d = unique_delays(k);
+                tap_x = tapX(d, max_delay, x_jump_delay_start, x_jump_delay_end);
+                drawNode(ax, tap_x, y_jump_center);
+
+                idx = find(abs(delays - d) < 1e-12, 1);
+                if ~isempty(idx)
+                    text(ax, tap_x, y_jump_center + 0.55, ...
+                        termDelayLabel(jump_terms(idx), time_mult), ...
+                        'FontSize', 9, ...
+                        'HorizontalAlignment', 'center', ...
+                        'VerticalAlignment', 'bottom', ...
+                        'Interpreter', 'tex');
+                end
+            end
         end
-        line(ax, [x_join x_sum-0.35], [y 0], 'Color', 'k', 'LineWidth', 1.5);
+
+        for i = 1:n_jump
+            y = y_jump(i);
+            if use_tapped_delay
+                tap_x = tapX(jump_terms(i).delay, max_delay, x_jump_delay_start, x_jump_delay_end);
+                line(ax, [tap_x tap_x], [y_jump_center y], 'Color', 'k', 'LineWidth', 1.5);
+                drawArrowLine(ax, tap_x, y, x_jump_amp - 0.55, y);
+            else
+                drawArrowLine(ax, x_split, y, x_jump_amp - 0.55, y);
+            end
+
+            drawAmplifier(ax, x_jump_amp, y, termCoeffLabel(jump_terms(i)));
+            drawNodeLabel(ax, x_jump_amp + 0.72, y, node_id); node_id = node_id + 1;
+            drawArrowLine(ax, x_jump_amp + 0.65, y, x_join, y);
+            line(ax, [x_join x_sum-0.35], [y 0], 'Color', 'k', 'LineWidth', 1.5);
+        end
     end
 
     % Ветви второго порядка (наклоны)
@@ -476,25 +524,68 @@ function drawSimplifiedDiagram(terms, time_mult)
             drawNodeLabel(ax, x_slope_inv + 0.82, y_slope_top, node_id); node_id = node_id + 1;
             line(ax, [x_join x_sum-0.35], [y_slope_top 0], 'Color', 'k', 'LineWidth', 1.5);
         else
-            y_branch = linspace(y_slope_center + (n_slope_lines-1)*0.65, ...
-                                y_slope_center - (n_slope_lines-1)*0.65, n_slope_lines);
-            line(ax, [x_int2+0.35 x_int2+0.35], [min(y_branch) max(y_branch)], 'Color', 'k', 'LineWidth', 1.5);
+            y_offsets = ((n_slope_lines-1)/2:-1:-(n_slope_lines-1)/2) * 0.8;
+            y_branch = y_slope_center + y_offsets;
 
-            for i = 1:length(slope_terms)
-                y = y_branch(i);
-                drawArrowLine(ax, x_int2 + 0.35, y, x_slope_amp - 0.55, y);
-                drawAmplifier(ax, x_slope_amp, y, termCoeffLabel(slope_terms(i)));
-                drawNodeLabel(ax, x_slope_amp + 0.72, y, node_id); node_id = node_id + 1;
+            delays = [slope_terms.delay];
+            max_delay = max(delays);
+            use_tapped_delay = length(slope_terms) > 1 && max_delay > 1e-15;
 
-                if abs(slope_terms(i).delay) > 1e-15
-                    drawArrowLine(ax, x_slope_amp + 0.65, y, x_slope_delay - 0.45, y);
-                    drawDelay(ax, x_slope_delay, y, termDelayLabel(slope_terms(i), time_mult));
-                    drawArrowLine(ax, x_slope_delay + 0.45, y, x_join, y);
-                    drawNodeLabel(ax, x_slope_delay + 0.65, y, node_id); node_id = node_id + 1;
-                else
-                    drawArrowLine(ax, x_slope_amp + 0.65, y, x_join, y);
+            if use_tapped_delay
+                % Для произвольного набора звеньев второго порядка задержки
+                % можно собрать в одну линию с отводами после общего второго
+                % интегратора. Масштабные блоки ставим после отводов.
+                drawArrowLine(ax, x_int2 + 0.35, y_slope_center, x_slope_tap_start, y_slope_center);
+                [~, idx_max_delay] = max(delays);
+                drawTappedDelay(ax, x_slope_tap_start, x_slope_tap_end, y_slope_center, ...
+                    termDelayLabel(slope_terms(idx_max_delay), time_mult));
+
+                unique_delays = unique(round(delays ./ 1e-15) .* 1e-15);
+                for k = 1:length(unique_delays)
+                    d = unique_delays(k);
+                    tap_x = tapX(d, max_delay, x_slope_tap_start, x_slope_tap_end);
+                    drawNode(ax, tap_x, y_slope_center);
+
+                    idx = find(abs(delays - d) < 1e-12, 1);
+                    if ~isempty(idx)
+                        text(ax, tap_x, y_slope_center + 0.55, ...
+                            termDelayLabel(slope_terms(idx), time_mult), ...
+                            'FontSize', 9, ...
+                            'HorizontalAlignment', 'center', ...
+                            'VerticalAlignment', 'bottom', ...
+                            'Interpreter', 'tex');
+                    end
                 end
-                line(ax, [x_join x_sum-0.35], [y 0], 'Color', 'k', 'LineWidth', 1.5);
+
+                for i = 1:length(slope_terms)
+                    y = y_branch(i);
+                    tap_x = tapX(slope_terms(i).delay, max_delay, x_slope_tap_start, x_slope_tap_end);
+                    line(ax, [tap_x tap_x], [y_slope_center y], 'Color', 'k', 'LineWidth', 1.5);
+                    drawArrowLine(ax, tap_x, y, x_slope_tap_amp - 0.55, y);
+                    drawAmplifier(ax, x_slope_tap_amp, y, termCoeffLabel(slope_terms(i)));
+                    drawNodeLabel(ax, x_slope_tap_amp + 0.72, y, node_id); node_id = node_id + 1;
+                    drawArrowLine(ax, x_slope_tap_amp + 0.65, y, x_join, y);
+                    line(ax, [x_join x_sum-0.35], [y 0], 'Color', 'k', 'LineWidth', 1.5);
+                end
+            else
+                line(ax, [x_int2+0.35 x_int2+0.35], [min(y_branch) max(y_branch)], 'Color', 'k', 'LineWidth', 1.5);
+
+                for i = 1:length(slope_terms)
+                    y = y_branch(i);
+                    drawArrowLine(ax, x_int2 + 0.35, y, x_slope_amp - 0.55, y);
+                    drawAmplifier(ax, x_slope_amp, y, termCoeffLabel(slope_terms(i)));
+                    drawNodeLabel(ax, x_slope_amp + 0.72, y, node_id); node_id = node_id + 1;
+
+                    if abs(slope_terms(i).delay) > 1e-15
+                        drawArrowLine(ax, x_slope_amp + 0.65, y, x_slope_delay - 0.45, y);
+                        drawDelay(ax, x_slope_delay, y, termDelayLabel(slope_terms(i), time_mult));
+                        drawArrowLine(ax, x_slope_delay + 0.45, y, x_join, y);
+                        drawNodeLabel(ax, x_slope_delay + 0.65, y, node_id); node_id = node_id + 1;
+                    else
+                        drawArrowLine(ax, x_slope_amp + 0.65, y, x_join, y);
+                    end
+                    line(ax, [x_join x_sum-0.35], [y 0], 'Color', 'k', 'LineWidth', 1.5);
+                end
             end
         end
     end
@@ -549,6 +640,25 @@ function drawDelay(ax, x, y, label)
         'LineWidth', 1.5, 'FaceColor', 'w', 'EdgeColor', 'k');
     text(ax, x, y, label, 'HorizontalAlignment', 'center', ...
         'VerticalAlignment', 'middle', 'FontSize', 10, 'Interpreter', 'tex');
+end
+
+function drawTappedDelay(ax, x1, x2, y, label)
+    rectangle(ax, 'Position', [x1, y-0.35, x2-x1, 0.7], ...
+        'LineWidth', 1.5, 'FaceColor', 'w', 'EdgeColor', 'k');
+    text(ax, (x1+x2)/2, y, ['\tau = ' label], ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'middle', ...
+        'FontSize', 10, ...
+        'Interpreter', 'tex');
+end
+
+function x = tapX(delay, max_delay, x1, x2)
+    if max_delay <= 1e-15
+        x = x1;
+    else
+        x = x1 + (delay ./ max_delay) .* (x2 - x1);
+    end
+    x = min(max(x, x1), x2);
 end
 
 function drawAmplifier(ax, x, y, label)

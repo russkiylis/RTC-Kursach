@@ -24,29 +24,32 @@ sp_max_mhz = sp_max .* 1e6;         % Максимум амплитудного 
 % чтобы получить положительное значение f_гр.
 f_sr = -f(find(abs(sp) >= 0.1.*(sp_max),1));
 f_sr_mhz = f_sr .* 1e-6;
+xlim_max_mhz = 1.5 .* f_sr_mhz;
+pos = f >= 0;
 
 
 figure(name="Аналитический спектр, fгр = " + sprintf("%.2f",f_sr_mhz) + " МГц", ...
     NumberTitle="off", Color='w');
-tiledlayout(2, 1);
+tiledlayout(2, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 % --- Амплитудный спектр ---
 nexttile;
-plot(f_mhz, abs_sp_mhz, LineWidth=2);
-xline([-f_sr_mhz f_sr_mhz], "--");
+plot(f_mhz(pos), abs_sp_mhz(pos), LineWidth=2);
+xline(f_sr_mhz, "--");
 yline(0.1.*sp_max_mhz, "--");
 xlabel("f, МГц");
 ylabel("|S(f)|, В/МГц");
 grid on;
 title("Амплитудный спектр");
-xlim([0 f_sr_mhz.*1.1]);
+xlim([0 xlim_max_mhz]);
 
 % --- Фазовый спектр ---
 nexttile;
-plot(f_mhz, angle(sp), LineWidth=2);
+plot(f_mhz(pos), angle(sp(pos)), LineWidth=2);
+xline(f_sr_mhz, "--");
 xlabel("f, МГц");
 ylabel("\phi_S(f), рад");
 grid on;
 title("Фазовый спектр");
-xlim([-f_sr_mhz.*1.1 f_sr_mhz.*1.1]);
+xlim([0 xlim_max_mhz]);
 end
